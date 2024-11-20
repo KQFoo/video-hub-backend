@@ -23,14 +23,6 @@ module.exports = function (sequelize, DataTypes) {
                 key: "playlist_id",
             },
         },
-        history_id: {
-            type: DataTypes.INTEGER,
-            allowNull: false,
-            references: {
-                model: "history",
-                key: "history_id",
-            },
-        },
         video_name: {
             type: DataTypes.STRING(255),
             allowNull: false
@@ -44,14 +36,10 @@ module.exports = function (sequelize, DataTypes) {
             allowNull: false,
             defaultValue: 0
         },
-        added_date: {
+        last_watched: {
             type: DataTypes.DATE,
             allowNull: false,
             defaultValue: DataTypes.NOW,
-        },
-        last_watched: {
-            type: DataTypes.DATE,
-            allowNull: false
         },
         downloaded: {
             type: DataTypes.BOOLEAN,
@@ -83,11 +71,6 @@ module.exports = function (sequelize, DataTypes) {
                 name: "v_playlist_id_fk",
                 using: "BTREE",
                 fields: [{ name: "playlist_id" }]
-            },
-            {
-                name: "v_history_id_fk",
-                using: "BTREE",
-                fields: [{ name: "history_id" }]
             }
         ]
     });
