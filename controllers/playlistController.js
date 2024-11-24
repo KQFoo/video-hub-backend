@@ -1,7 +1,7 @@
 const db = require('../config/db');
 const { playlist, video } = db.models;
 
-const playlistController = {
+module.exports = {
     findAllVideos: async (req, res) => {
         try {
             const playlist_id = req.params.id;
@@ -24,6 +24,4 @@ const playlistController = {
             res.status(500).json({ error: error.message });
         }
     }
-};
-
-module.exports = playlistController; 
+}

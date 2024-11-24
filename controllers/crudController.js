@@ -1,5 +1,5 @@
-// const db = require("../config/db");
-// const { user } = db.models;
+const db = require("../config/db");
+const { user, video, playlist } = db.models;
 
 // create
 exports.create = (Model) => async (req, res) => {
@@ -36,7 +36,13 @@ exports.findAll = (Model) => async (req, res) => {
 };
 
 // update
-// PUT request
+exports.update = (Model) => async (req, res) => {
+    try {
+
+    } catch (error) {
+
+    }
+};
 
 // delete
 exports.delete = (Model) => async (req, res) => {

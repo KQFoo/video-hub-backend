@@ -1,7 +1,7 @@
 const db = require('../config/db');
 const { playlist, user } = db.models;
 
-const userController = {
+module.exports = {
     findAllPlaylists: async (req, res) => {
         try {
             const user_id = req.params.id;
@@ -24,6 +24,4 @@ const userController = {
             res.status(500).json({ error: error.message });
         }
     }
-};
-
-module.exports = userController; 
+}

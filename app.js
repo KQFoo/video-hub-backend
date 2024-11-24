@@ -1,12 +1,19 @@
-const express = require("express");
+const express = require('express');
+const cors = require('cors');
 const app = express();
 const mainRouter = require("./routes/index");
 require("./config/db"); // Running database
 require("dotenv").config();
 
-app.use(express.json());
+// Enable CORS
+app.use(cors());
 
-app.use("/", mainRouter);
+// Parse JSON bodies
+app.use(express.json());
+app.set("view engine", "ejs");
+app.set("views", "./views");
+
+app.use("/", mainRouter); // index.js
 
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, (err) => {

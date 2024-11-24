@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Downloader</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            background-color: #f4f4f4;
+        }
+
+        .video-container {
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        #infoForm {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+
+        button {
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        .video-info {
+            margin-top: 20px;
+            display: none;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .thumbnail {
+            max-width: 100%;
+            height: auto;
+            border-radius: 4px;
+            margin-bottom: 15px;
+        }
+
+        .error {
+            color: #dc3545;
+            padding: 10px;
+            margin-top: 10px;
+            border: 1px solid #dc3545;
+            border-radius: 4px;
+            display: none;
+        }
+
+        .loading {
+            text-align: center;
+            display: none;
+            margin: 20px 0;
+        }
+
+        .format-select {
+            margin: 15px 0;
+            padding: 8px;
+            width: 100%;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+
+        .video-details {
+            margin: 15px 0;
+        }
+
+        .video-details p {
+            margin: 8px 0;
+        }
+
+        #downloadProgress {
+            width: 100%;
+            height: 20px;
+            background-color: #f0f0f0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+            display: none;
+        }
+
+        #progressBar {
+            width: 0%;
+            height: 100%;
+            background-color: #4CAF50;
+            transition: width 0.3s;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- <div>
+        <video width="400" controls>
+            <source src="https://ik.imagekit.io/ikmedia/example_video.mp4" type="video/mp4">
+        </video>
+    </div> -->
+
+    <div class="video-container">
+        <h1>YouTube Video Downloader</h1>
+
+        <!-- Info Form -->
+        <form id="infoForm">
+            <input type="text" id="url" placeholder="Enter YouTube URL" required>
+            <button type="submit">Get Video Info</button>
+        </form>
+
+        <!-- Loading Indicator -->
+        <div id="loading" class="loading">
+            Loading video information...
+        </div>
+
+        <!-- Video Info Display -->
+        <div id="videoInfo" class="video-info">
+            <img id="thumbnail" class="thumbnail" alt="Video thumbnail">
+            <div class="video-details">
+                <h2 id="title"></h2>
+                <p>Channel: <span id="author"></span></p>
+                <p>Duration: <span id="duration"></span></p>
+                <p>Views: <span id="views"></span></p>
+            </div>
+
+            <select id="formatSelect" class="format-select">
+                <option value="">Select quality...</option>
+            </select>
+
+            <div id="downloadProgress">
+                <div id="progressBar"></div>
+            </div>
+
+            <button id="downloadButton" onclick="downloadVideo()">Download Video</button>
+        </div>
+
+        <div id="error" class="error"></div>
+    </div>
+
+    <script>
+        const API_BASE_URL = '/video';
+        const infoForm = document.getElementById('infoForm');
+        const videoInfo = document.getElementById('videoInfo');
+        const errorDiv = document.getElementById('error');
+        const loadingDiv = document.getElementById('loading');
+        const formatSelect = document.getElementById('formatSelect');
+        const downloadProgress = document.getElementById('downloadProgress');
+        const progressBar = document.getElementById('progressBar');
+
+        infoForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const url = document.getElementById('url').value;
+
+            // Reset UI
+            errorDiv.style.display = 'none';
+            videoInfo.style.display = 'none';
+            loadingDiv.style.display = 'block';
+            formatSelect.innerHTML = '<option value="">Select quality...</option>';
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/info?url=${encodeURIComponent(url)}`);
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to fetch video info');
+                }
+
+                // Display video info
+                document.getElementById('thumbnail').src = data.thumbnails[0].url;
+                document.getElementById('title').textContent = data.title;
+                document.getElementById('author').textContent = data.author.name;
+                document.getElementById('duration').textContent = formatDuration(data.lengthSeconds);
+                document.getElementById('views').textContent = formatNumber(data.viewCount);
+
+                // Populate format select
+                data.formats.forEach(format => {
+                    if (format.hasVideo && format.hasAudio) {
+                        const option = document.createElement('option');
+                        option.value = format.quality;
+                        option.textContent = `${format.quality} - ${format.container}`;
+                        formatSelect.appendChild(option);
+                    }
+                });
+
+                videoInfo.style.display = 'block';
+            } catch (error) {
+                errorDiv.textContent = error.message;
+                errorDiv.style.display = 'block';
+            } finally {
+                loadingDiv.style.display = 'none';
+            }
+        });
+
+        async function downloadVideo() {
+            const url = document.getElementById('url').value;
+            const quality = formatSelect.value || 'highest';
+
+            try {
+                downloadProgress.style.display = 'block';
+                progressBar.style.width = '0%';
+
+                const response = await fetch(
+                    `${API_BASE_URL}/download?url=${encodeURIComponent(url)}&quality=${quality}`,
+                    { method: 'GET' }
+                );
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Download failed');
+                }
+
+                // Create a download link
+                const blob = await response.blob();
+                const downloadUrl = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = downloadUrl;
+                a.download = `${document.getElementById('title').textContent}.mp4`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(downloadUrl);
+                document.body.removeChild(a);
+
+            } catch (error) {
+                errorDiv.textContent = error.message;
+                errorDiv.style.display = 'block';
+            } finally {
+                downloadProgress.style.display = 'none';
+            }
+        }
+
+        function formatDuration(seconds) {
+            const hours = Math.floor(seconds / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            const remainingSeconds = seconds % 60;
+
+            if (hours > 0) {
+                return `${hours}:${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+            }
+            return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+        }
+
+        function formatNumber(num) {
+            return new Intl.NumberFormat().format(num);
+        }
+    </script>
+</body>
+
+</html>
