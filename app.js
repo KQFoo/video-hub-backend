@@ -4,9 +4,7 @@ const app = express();
 const mainRouter = require("./routes/index");
 require("./config/db"); // Running database
 require("dotenv").config();
-//123
-// Hello World0
-//12323
+
 // Enable CORS
 app.use(cors());
 
