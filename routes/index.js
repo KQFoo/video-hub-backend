@@ -17,18 +17,13 @@ router.get("/downloader", (req, res) => {
     res.render("index");
 });
 
-// Routes (Fetch video info, Download, Search anywhere, Update Playlist)
-router.use("/video", videoRoutes);
-
-// Routes (Find all playlists)
-router.use("/user", userRoutes);
-
-// Routes (Find all videos)
-router.use("/playlist", playlistRoutes);
+router.use("/videos", videoRoutes);       // Video Routes
+router.use("/users", userRoutes);         // User Routes
+router.use("/playlists", playlistRoutes); // Playlist Routes
 
 // Standard CRUD Routes for all models
-router.use("/api/user", generateCrudRoutes(models.user));
-router.use("/api/video", generateCrudRoutes(models.video));
-router.use("/api/playlist", generateCrudRoutes(models.playlist));
+router.use("/api/users", generateCrudRoutes(models.user));
+router.use("/api/videos", generateCrudRoutes(models.video));
+router.use("/api/playlists", generateCrudRoutes(models.playlist));
 
 module.exports = router;

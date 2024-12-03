@@ -1,286 +1,431 @@
 const ytdl = require('ytdl-core');
-const { setTimeout } = require('timers/promises');
+const ytDlp = require('yt-dlp-exec');
 const db = require('../config/db');
-const { video } = db.models;
+const { video, playlist } = db.models;
 const { Op } = require("sequelize");
-
-const CONFIG = {
-    MAX_RETRIES: 3,
-    RETRY_DELAY: 1000,
-    DEFAULT_HEADERS: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': '*/*',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Accept-Encoding': 'gzip, deflate, br',
-        'Range': 'bytes=0-',
-        'Referer': 'https://www.youtube.com/',
-        'Origin': 'https://www.youtube.com',
-        'sec-ch-ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
-        'sec-ch-ua-mobile': '?0',
-        'sec-ch-ua-platform': '"Windows"',
-        'sec-fetch-dest': 'video',
-        'sec-fetch-mode': 'cors',
-        'sec-fetch-site': 'cross-site'
-    }
-};
-
-async function downloadVideo(req, res) {
-    const { url } = req.query;
-    let { quality = 'highest' } = req.query;
-    let retryCount = 0;
-
-    while (retryCount < CONFIG.MAX_RETRIES) {
-        try {
-            console.log(`Attempt ${retryCount + 1} to download video:`, url);
-
-            if (!ytdl.validateURL(url)) {
-                return res.status(400).json({ error: 'Invalid YouTube URL' });
-            }
-
-            // Get fresh video info on each attempt
-            const info = await ytdl.getInfo(url, {
-                requestOptions: {
-                    headers: CONFIG.DEFAULT_HEADERS
-                }
-            });
-
-            // Get all formats with both video and audio
-            const formats = info.formats.filter(format =>
-                format.hasVideo &&
-                format.hasAudio &&
-                format.container === 'mp4'
-            );
-
-            if (formats.length === 0) {
-                throw new Error('No suitable formats found with both video and audio');
-            }
-
-            // Sort formats by quality
-            formats.sort((a, b) => {
-                const getQualityNumber = (format) => {
-                    if (!format.qualityLabel) return 0;
-                    return parseInt(format.qualityLabel) || 0;
-                };
-                return getQualityNumber(b) - getQualityNumber(a);
-            });
-
-            // Select format based on quality preference
-            let selectedFormat;
-            if (quality === 'highest') {
-                selectedFormat = formats[0];
-            } else if (quality === 'lowest') {
-                selectedFormat = formats[formats.length - 1];
-            } else {
-                selectedFormat = formats.find(f => f.qualityLabel === quality) || formats[0];
-            }
-
-            console.log('Selected format:', {
-                quality: selectedFormat.qualityLabel,
-                container: selectedFormat.container,
-                hasAudio: selectedFormat.hasAudio,
-                hasVideo: selectedFormat.hasVideo,
-                url: selectedFormat.url ? 'Available' : 'Not available'
-            });
-
-            // Set headers
-            const sanitizedTitle = info.videoDetails.title
-                .replace(/[^\x00-\x7F]/g, '')
-                .replace(/[^a-zA-Z0-9-_]/g, '_')
-                .substring(0, 100);
-
-            res.setHeader('Content-Type', 'video/mp4');
-            res.setHeader('Content-Disposition', `attachment; filename="${sanitizedTitle}.mp4"`);
-
-            // Create stream with the selected format
-            const stream = ytdl.downloadFromInfo(info, {
-                format: selectedFormat,
-                requestOptions: {
-                    headers: CONFIG.DEFAULT_HEADERS
-                }
-            });
-
-            // Handle stream events
-            stream.on('error', async (error) => {
-                console.error('Stream Error:', error);
-                if (!res.headersSent) {
-                    if (retryCount < CONFIG.MAX_RETRIES - 1) {
-                        retryCount++;
-                        console.log(`Retrying... Attempt ${retryCount + 1}`);
-                        await setTimeout(CONFIG.RETRY_DELAY);
-                    } else {
-                        res.status(500).json({
-                            error: 'Download failed',
-                            details: error.message
-                        });
-                    }
-                }
-            });
-
-            let downloadedBytes = 0;
-            stream.on('data', (chunk) => {
-                downloadedBytes += chunk.length;
-                if (downloadedBytes % (1024 * 1024) === 0) {
-                    console.log(`Downloaded: ${downloadedBytes / (1024 * 1024)}MB`);
-                }
-            });
-
-            stream.on('end', () => {
-                console.log('Download completed');
-            });
-
-            // Handle client disconnect
-            req.on('close', () => {
-                stream.destroy();
-                console.log('Client disconnected');
-            });
-
-            // Pipe the stream to response
-            stream.pipe(res);
-            return;
-
-        } catch (error) {
-            console.error(`Attempt ${retryCount + 1} failed:`, error);
-            retryCount++;
-
-            if (retryCount < CONFIG.MAX_RETRIES) {
-                console.log(`Retrying in ${CONFIG.RETRY_DELAY}ms...`);
-                await setTimeout(CONFIG.RETRY_DELAY);
-                continue;
-            }
-
-            if (!res.headersSent) {
-                return res.status(500).json({
-                    error: 'Download failed after all retries',
-                    details: error.message
-                });
-            }
-        }
-    }
-}
+const path = require('path');
+const fs = require('fs').promises;
+const os = require('os');
+const { uploadToCloud, deleteFromCloud } = require('../config/cloudinary');
 
 module.exports = {
-    downloadVideo,
+    downloadVideo: async (req, res) => {
+        try {
+            const { url, playlist_id } = req.body;
+
+            if(!url) {
+                return res.status(400).json({
+                    success: false, 
+                    message: "URL is required"
+                });
+            }
+
+            // Get video info
+            const videoInfo = await ytdl.getInfo(url);
+            const videoTitle = videoInfo.videoDetails.title.replace(/[^\w\s]/gi, '');
+
+            // Get playlist name
+            const playlistInfo = await playlist.findByPk(playlist_id);
+            if(!playlistInfo) {
+                return res.status(401).json({
+                    success: false, 
+                    message: "Playlist not found"
+                });
+            }
+
+            // Create downloads directory structure
+            const downloadDir = path.join(os.homedir(), 'Downloads/VideoHub', playlistInfo.playlist_name);
+            await fs.mkdir(downloadDir, { recursive: true });
+
+            const videoPath = path.join(downloadDir, `${videoTitle}.mp4`);
+
+            // Download video using yt-dlp
+            try {
+                await ytDlp(url, {
+                    output: videoPath,
+                    format: 'best[ext=mp4]'
+                });
+
+                // Upload to Cloudinary
+                let cloudData = null;
+                try {
+                    cloudData = await uploadToCloud(videoPath, `VideoHub/${playlistInfo.playlist_name}`);
+                } catch (error) {
+                    console.error('Cloud upload failed:', error);
+                    // Continue with local storage only
+                }
+
+                // Save to database
+                const videoRecord = await video.create({
+                    user_id: 1,
+                    playlist_id: playlist_id,
+                    video_name: videoTitle,
+                    link: url,
+                    video_path: videoPath,
+                    cloud_url: cloudData?.url || null,
+                    cloud_public_id: cloudData?.public_id || null,
+                    downloaded: true,
+                    thumbnail: videoInfo.videoDetails.thumbnails[0]?.url || null,
+                    duration: videoInfo.videoDetails.lengthSeconds
+                });
+
+                res.status(200).json({
+                    success: true,
+                    message: cloudData ? "Video downloaded and uploaded to cloud" : "Video downloaded locally",
+                    video: videoRecord
+                });
+
+            } catch (error) {
+                return res.status(402).json({
+                    success: false, 
+                    message: "Video download failed",
+                    error: error.message
+                });
+            }
+
+        } catch (error) {
+            res.status(500).json({
+                success: false,
+                message: error.message
+            });
+        }
+    },
+
     getVideoInfo: async (req, res) => {
+        try {
+            const { video_id } = req.params;
+
+            const videoInfo = await video.findByPk(video_id);
+            if (!videoInfo) {
+                return res.status(404).json({
+                    success: false,
+                    message: "Video not found"
+                });
+            }
+
+            res.status(200).json({
+                success: true,
+                info: videoInfo
+            });
+
+        } catch (error) {   
+            res.status(500).json({
+                success: false,
+                message: error.message
+            });
+        }
+    },
+
+    fetchVideoInfo: async (req, res) => {
         try {
             const { url } = req.query;
 
-            if (!ytdl.validateURL(url)) {
-                return res.status(400).json({ error: 'Invalid YouTube URL' });
+            if (!url) {
+                return res.status(400).json({ 
+                    success: false,
+                    message: "URL is required" 
+                });
             }
 
-            const info = await ytdl.getInfo(url);
-
-            const videoInfo = {
-                title: info.videoDetails.title,
-                thumbnails: info.videoDetails.thumbnails,
-                lengthSeconds: info.videoDetails.lengthSeconds,
-                viewCount: info.videoDetails.viewCount,
-                author: {
-                    name: info.videoDetails.author.name,
-                    channel_url: info.videoDetails.author.channel_url
-                },
-                formats: info.formats
-                    .filter(format => format.hasVideo && format.hasAudio)
-                    .map(format => ({
-                        quality: format.qualityLabel,
-                        container: format.container,
-                        hasAudio: format.hasAudio,
-                        hasVideo: format.hasVideo,
-                        itag: format.it
-                    }))
+            const videoInfo = await ytdl.getInfo(url);
+            
+            const info = {
+                title: videoInfo.videoDetails.title,
+                duration: videoInfo.videoDetails.lengthSeconds,
+                thumbnail: videoInfo.videoDetails.thumbnails[0]?.url || null,
+                author: videoInfo.videoDetails.author.name,
+                views: videoInfo.videoDetails.viewCount,
+                formats: videoInfo.formats.map(format => ({
+                    quality: format.qualityLabel,
+                    container: format.container,
+                    size: format.contentLength
+                }))
             };
 
-            return res.json(videoInfo);
+            res.status(200).json({
+                success: true,
+                info: info
+            });
         } catch (error) {
-            console.error('Error getting video info:', error);
-            return res.status(500).json({ error: 'Error getting video info' });
+            res.status(500).json({
+                success: false,
+                message: error.message
+            });
+        }
+    },
+
+    displayVideo: async (req, res) => {
+        try {
+            const { video_id } = req.params;
+
+            const videoInfo = await video.findByPk(video_id);
+            if (!videoInfo) {
+                return res.status(404).json({
+                    success: false,
+                    message: "Video not found"
+                });
+            }
+
+            try {
+                await fs.access(videoInfo.video_path);
+            } catch (error) {
+                return res.status(404).json({
+                    success: false,
+                    message: "Video not found"
+                });
+            }
+
+            res.status(200).sendFile(videoInfo.video_path, (err) => {
+                if (err) {
+                    res.status(404).json({
+                        success: false,
+                        message: "Video display failed"
+                    });
+                }
+            });
+        } catch (error) {
+            res.status(500).json({
+                success: false,
+                message: error.message
+            });
+        }
+    },
+
+    incrementView: async (req, res) => {
+        try {
+            const { video_id } = req.params;
+
+            const videoInfo = await video.findByPk(video_id);
+            if (!videoInfo) {
+                return res.status(404).json({
+                    success: false,
+                    message: "Video not found"
+                });
+            }
+
+            const updatedCount = await video.update(
+                {
+                    views: videoInfo.views + 1,
+                    last_watched: new Date(),
+                    updated_at: new Date()
+                },
+                {
+                    where: { video_id: video_id }
+                }
+            );
+
+            if (updatedCount === 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: "View count not updated"
+                });
+            }
+
+            const updatedVideo = await video.findByPk(video_id);
+            
+            res.status(200).json({
+                success: true,
+                info: {
+                    video_id: updatedVideo.video_id,
+                    video_name: updatedVideo.video_name,
+                    link: updatedVideo.link,
+                    video_path: updatedVideo.video_path,
+                    last_watched: updatedVideo.last_watched,
+                    created_at: updatedVideo.created_at,
+                    updated_at: updatedVideo.updated_at,
+                    views: updatedVideo.views
+                }
+            });
+
+        } catch (error) {
+            res.status(500).json({
+                success: false,
+                message: error.message
+            });
+        }
+    },
+
+    retrieveOld: async (req, res) => {
+        try {
+            const videos = await video.findAll({
+                where: {
+                    downloaded: true,
+                    last_watched: { [Op.lt]: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) }
+                },
+                limit: 10,
+                offset: 0
+            });
+
+            if (videos.length === 0) {
+                return res.status(404).json({
+                    success: false,
+                    message: "No videos were found"
+                });
+            }
+
+            res.status(200).json({
+                success: true,
+                info: videos
+            }); 
+        } catch (error) {
+            res.status(500).json({
+                success: false,
+                message: error.message
+            });
+        }
+    },
+
+    deleteVideo: async (req, res) => {
+        try {
+            const { video_id } = req.params;
+
+            const videoInfo = await video.findByPk(video_id);
+            if (!videoInfo) {
+                return res.status(404).json({
+                    success: false,
+                    message: "Video not found"
+                });
+            }
+
+            // Delete from database
+            const deletedCount = await video.destroy({
+                where: { video_id: video_id }
+            });
+
+            if (deletedCount === 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Video not deleted"
+                });
+            }
+
+            // Delete local file
+            try {
+                await fs.unlink(videoInfo.video_path);
+            } catch (error) {
+                console.error('Error deleting local file:', error);
+            }
+
+            // Delete from cloud storage if exists
+            if (videoInfo.cloud_public_id) {
+                try {
+                    await deleteFromCloud(videoInfo.cloud_public_id);
+                } catch (error) {
+                    console.error('Error deleting from cloud:', error);
+                }
+            }
+
+            res.status(200).json({
+                success: true,
+                message: "Video deleted successfully"
+            });
+        } catch (error) {
+            res.status(500).json({
+                success: false,
+                message: error.message
+            });
         }
     },
 
     searchVideo: async (req, res) => {
         try {
             const query = req.query.query;
-            const type = req.query.type;
 
             if (!query) {
-                return res.status(400).json("Search query not found");
+                return res.status(400).json({
+                    success: false,
+                    message: "Query is required"
+                });
             }
-
-            let results;
-
-            switch (type) {
-                case "all":
-                    results = await video.findAll({
-                        where: {
-                            video_name: { [Op.like]: `${query}%` },
-                        },
-                        limit: 10,
-                        offset: 0
-                    });
-                    break;
-                case "saved":
-                    results = await video.findAll({
-                        where: {
-                            video_name: { [Op.like]: `${query}%` },
-                            downloaded: false
-                        },
-                        limit: 10,
-                        offset: 0
-                    });
-                    break;
-                case "downloaded":
-                    results = await video.findAll({
-                        where: {
-                            video_name: { [Op.like]: `${query}%` },
-                            downloaded: true
-                        },
-                        limit: 10,
-                        offset: 0
-                    });
-                    break;
-            }
+            
+            const results = await video.findAll({
+                where: {
+                    video_name: { [Op.like]: `${query}%` },
+                    downloaded: true
+                },
+                limit: 10,
+                offset: 0
+            });
 
             if (results.length === 0) {
-                return res.status(404).json("No videos were found");
+                return res.status(404).json({
+                    success: false,
+                    message: "No results found"
+                });
             }
 
-            res.status(200).json(results);
+            res.status(200).json({
+                success: true,
+                info: results
+            });
         } catch (error) {
-            res.status(500).json({ error: error.message });
+            res.status(500).json({
+                success: false,
+                message: error.message
+            });
         }
     },
-    updatePlaylist: async (req, res) => {
+
+    getCloudUrl: async (req, res) => {
         try {
-            const video_id = req.params.video_id;
-            const playlist_id = req.params.playlist_id;
+            const { video_id } = req.params;
 
-            const _video = await video.findByPk(video_id);
-            if (!_video) {
-                return res.status(404).json({ message: "Video not found" });
+            const videoInfo = await video.findByPk(video_id);
+            if (!videoInfo) {
+                return res.status(404).json({
+                    success: false,
+                    message: "Video not found"
+                });
             }
 
-            const _playlist = await playlist.findByPk(playlist_id);
-            if (!_playlist) {
-                return res.status(404).json({ message: "Playlist not found" });
+            if (!videoInfo.cloud_url) {
+                return res.status(404).json({
+                    success: false,
+                    message: "Video not available in cloud storage"
+                });
             }
 
-            const updatedCount = await video.update(
-                {
-                    playlist_id: playlist_id
-                },
-                {
-                    where: { video_id: video_id }
-                }
-            )
-
-            if (updatedCount === 0) {
-                return res.status(400).json({ message: "No changes made" });
-            }
-
-            const updatedVideo = await video.findByPk(video_id);
-            res.status(200).json(updatedVideo);
+            res.status(200).json({
+                success: true,
+                url: videoInfo.cloud_url
+            });
         } catch (error) {
-            res.status(500).json({ error: error.message });
+            res.status(500).json({
+                success: false,
+                message: error.message
+            });
+        }
+    },
+
+    getCloudVideos: async (req, res) => {
+        try {
+            // Find all videos that have cloud URLs
+            const cloudVideos = await video.findAll({
+                where: {
+                    cloud_url: {
+                        [Op.ne]: null
+                    }
+                },
+                attributes: ['video_id', 'video_name', 'cloud_url', 'thumbnail', 'duration'],
+                order: [['created_at', 'DESC']]
+            });
+
+            res.status(200).json({
+                success: true,
+                count: cloudVideos.length,
+                videos: cloudVideos.map(v => ({
+                    id: v.video_id,
+                    name: v.video_name,
+                    url: v.cloud_url,
+                    thumbnail: v.thumbnail,
+                    duration: v.duration
+                }))
+            });
+        } catch (error) {
+            res.status(500).json({
+                success: false,
+                message: error.message
+            });
         }
     }
 };

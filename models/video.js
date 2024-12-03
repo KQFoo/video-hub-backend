@@ -31,7 +31,11 @@ module.exports = function (sequelize, DataTypes) {
             type: DataTypes.STRING(255),
             allowNull: false
         },
-        play_count: {
+        video_path: {
+            type: DataTypes.STRING(255),
+            allowNull: false
+        },
+        views: {
             type: DataTypes.INTEGER,
             allowNull: false,
             defaultValue: 0
@@ -45,6 +49,22 @@ module.exports = function (sequelize, DataTypes) {
             type: DataTypes.BOOLEAN,
             allowNull: false,
             defaultValue: false,
+        },
+        thumbnail: {
+            type: DataTypes.STRING(255),
+            allowNull: false
+        },
+        duration: {
+            type: DataTypes.INTEGER,
+            allowNull: false
+        },
+        cloud_url: {
+            type: DataTypes.STRING(255),
+            allowNull: true
+        },
+        cloud_public_id: {
+            type: DataTypes.STRING(255),
+            allowNull: true
         }
     }, {
         sequelize,
