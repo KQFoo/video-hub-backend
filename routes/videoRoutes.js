@@ -38,7 +38,7 @@ router.get("/:video_id/display", videoController.displayVideo);
  * @url /video/{video_id}/rename
  * @body video_name={video_name}
  */
-router.post("/:video_id/rename", videoController.renameVideo);
+router.put("/:video_id/rename", videoController.renameVideo);
 
 /**
  * @description display the video

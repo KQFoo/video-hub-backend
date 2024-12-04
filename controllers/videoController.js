@@ -214,17 +214,35 @@ module.exports = {
                 }
             );
 
+            // Rename local file if it exists
+            try {
+                await fs.access(videoInfo.video_path);
+                await fs.rename(videoInfo.video_path, path.join(os.homedir(), `Downloads/VideoHub/Music/${video_name}.mp4`));
+            } catch (error) {
+                return res.status(404).json({
+                    success: false,
+                    message: "Video rename failed"
+                });
+            }
+        
+            if (updatedVideo === 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Video name not updated"
+                });
+            }
+
             res.status(200).json({
                 success: true,
                 info: {
-                    video_id: videoInfo.video_id,
-                    video_name: videoInfo.video_name,
-                    link: videoInfo.link,
-                    video_path: videoInfo.video_path,
-                    last_watched: videoInfo.last_watched,
-                    created_at: videoInfo.created_at,
-                    updated_at: videoInfo.updated_at,
-                    views: videoInfo.views
+                    video_id: updatedVideo.video_id,
+                    video_name: updatedVideo.video_name,
+                    link: updatedVideo.link,
+                    video_path: updatedVideo.video_path,
+                    last_watched: updatedVideo.last_watched,
+                    created_at: updatedVideo.created_at,
+                    updated_at: updatedVideo.updated_at,
+                    views: updatedVideo.views
                 }
             });
         } catch (error) {
