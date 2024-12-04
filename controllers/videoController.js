@@ -191,6 +191,50 @@ module.exports = {
         }
     },
 
+    renameVideo: async (req, res) => {
+        try {
+            const { video_id } = req.params;
+            const { video_name } = req.body;
+
+            const videoInfo = await video.findByPk(video_id);
+            if (!videoInfo) {
+                return res.status(404).json({
+                    success: false,
+                    message: "Video not found"
+                });
+            }
+
+            const updatedVideo = await video.update(
+                {
+                    video_name: video_name,
+                    updated_at: new Date()
+                },
+                {
+                    where: { video_id: video_id }
+                }
+            );
+
+            res.status(200).json({
+                success: true,
+                info: {
+                    video_id: videoInfo.video_id,
+                    video_name: videoInfo.video_name,
+                    link: videoInfo.link,
+                    video_path: videoInfo.video_path,
+                    last_watched: videoInfo.last_watched,
+                    created_at: videoInfo.created_at,
+                    updated_at: videoInfo.updated_at,
+                    views: videoInfo.views
+                }
+            });
+        } catch (error) {
+            res.status(500).json({
+                success: false,
+                message: error.message
+            });
+        }
+    },
+
     incrementView: async (req, res) => {
         try {
             const { video_id } = req.params;
@@ -330,6 +374,7 @@ module.exports = {
     searchVideo: async (req, res) => {
         try {
             const query = req.query.query;
+            const type = (req.query.type).toLowerCase() || 'all';
 
             if (!query) {
                 return res.status(400).json({
@@ -337,15 +382,55 @@ module.exports = {
                     message: "Query is required"
                 });
             }
-            
-            const results = await video.findAll({
+
+            const videoPlaylist = await playlist.findOne({
                 where: {
-                    video_name: { [Op.like]: `${query}%` },
-                    downloaded: true
-                },
-                limit: 10,
-                offset: 0
+                    playlist_name: type === 'music' ? 'Music' : 'General'
+                }
             });
+
+            if (!videoPlaylist) {
+                return res.status(404).json({
+                    success: false,
+                    message: "Playlist not found"
+                });
+            }
+            
+            let results;
+            switch (type) {
+                case "all":
+                    results = await video.findAll({
+                        where: {
+                            video_name: { [Op.like]: `${query}%` },
+                            downloaded: true
+                        },
+                        limit: 10,
+                        offset: 0
+                    });
+                    break;
+                case "music":
+                    results = await video.findAll({
+                        where: {
+                            video_name: { [Op.like]: `${query}%` },
+                            downloaded: true,
+                            playlist_id: videoPlaylist.playlist_id
+                        },
+                        limit: 10,
+                        offset: 0
+                    });
+                    break;
+                case "general":
+                    results = await video.findAll({
+                        where: {
+                            video_name: { [Op.like]: `${query}%` },
+                            downloaded: true,
+                            playlist_id: videoPlaylist.playlist_id
+                        },
+                        limit: 10,
+                        offset: 0
+                    });
+                    break;
+            }
 
             if (results.length === 0) {
                 return res.status(404).json({

@@ -12,11 +12,6 @@ router.get("/", (req, res) => {
     res.send("Hello, World!");
 });
 
-// Download View
-router.get("/downloader", (req, res) => {
-    res.render("index");
-});
-
 router.use("/videos", videoRoutes);       // Video Routes
 router.use("/users", userRoutes);         // User Routes
 router.use("/playlists", playlistRoutes); // Playlist Routes

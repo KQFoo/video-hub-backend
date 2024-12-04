@@ -34,6 +34,13 @@ router.post("/download", videoController.downloadVideo);
 router.get("/:video_id/display", videoController.displayVideo);
 
 /**
+ * @description rename the video
+ * @url /video/{video_id}/rename
+ * @body video_name={video_name}
+ */
+router.post("/:video_id/rename", videoController.renameVideo);
+
+/**
  * @description display the video
  * @url /video/display/{video_id}
  */
@@ -53,7 +60,7 @@ router.get('/cloud-videos', videoController.getCloudVideos);
 
 /**
  * @description search anywhere
- * @url /video/search?query={search_query}
+ * @url /video/search?query={search_query}&type={all/music/general}
  */
 router.get("/search", videoController.searchVideo);
 
