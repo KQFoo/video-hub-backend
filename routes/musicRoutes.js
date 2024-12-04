@@ -4,16 +4,18 @@ const musicController = require('../controllers/musicController');
 const musicService = require('../services/musicService');
 
 /**
- * @description Test page for lyrics container
- * @url /music/test-lyrics
+ * @route   GET /music/test-lyrics
+ * @desc    Test page for lyrics container
  */
 router.get('/test-lyrics', (req, res) => {
     res.render('lyrics');
 });
 
 /**
- * @description Test lyrics fetching
- * @url /music/test-lyrics/fetch?artist={artist}&track={track}
+ * @route   GET /music/test-lyrics/fetch?artist={artist}&track={track}
+ * @desc    Test lyrics fetching
+ * @query   artist
+ * @query   track
  */
 router.get('/test-lyrics/fetch', async (req, res) => {
     try {
@@ -46,8 +48,9 @@ router.get('/test-lyrics/fetch', async (req, res) => {
 });
 
 /**
- * @description Get music information (lyrics, artist info, track details)
- * @url /music/video/{video_id}/info
+ * @route   GET /music/video/{video_id}/info
+ * @desc    Get music information (lyrics, artist info, track details)
+ * @params  video_id
  * @returns {
  *   lyrics: { title, lyrics_url, thumbnail, artist, lyrics },
  *   artist: { name, bio, tags, similar_artists, stats },

@@ -6,16 +6,18 @@ const videoRoutes = require("./videoRoutes");
 const userRoutes = require("./userRoutes");
 const playlistRoutes = require("./playlistRoutes");
 const musicRoutes = require("./musicRoutes");
+const recommendationRoutes = require('./recommendationRoutes');
 
 // Default Main
 router.get("/", (req, res) => {
     res.send("Hello, World!");
 });
 
-router.use("/videos", videoRoutes);       // Video Routes
-router.use("/users", userRoutes);         // User Routes
-router.use("/playlists", playlistRoutes); // Playlist Routes
-router.use("/music", musicRoutes);        // Music Info Routes
+router.use("/videos", videoRoutes);                   // Video Routes
+router.use("/users", userRoutes);                     // User Routes
+router.use("/playlists", playlistRoutes);             // Playlist Routes
+router.use("/music", musicRoutes);                    // Music Info Routes
+router.use('/recommendations', recommendationRoutes); // Recommendation Routes
 
 // Standard CRUD Routes for all models
 router.use("/api/users", generateCrudRoutes(models.user));
