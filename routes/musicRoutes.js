@@ -59,4 +59,12 @@ router.get('/test-lyrics/fetch', async (req, res) => {
  */
 router.get('/video/:video_id/info', musicController.getMusicInfo);
 
+/**
+ * @route   GET /music/video/{video_id}/lyrics
+ * @desc    Get lyrics for a video
+ * @params  video_id
+ * @returns { lyrics: string }
+ */
+router.get('/video/:video_id/lyrics', musicController.getLyrics);
+
 module.exports = router;

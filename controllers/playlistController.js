@@ -77,7 +77,10 @@ module.exports = {
                 return res.status(404).json({ message: "No videos were found" });
             }
 
-            res.status(200).json(videos);
+            res.status(200).json({
+                success: true,
+                data: videos
+            });
         } catch (error) {
             res.status(500).json({ error: error.message });
         }

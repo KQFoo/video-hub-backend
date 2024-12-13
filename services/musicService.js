@@ -1,5 +1,12 @@
 const axios = require('axios');
 const cheerio = require('cheerio');
+const NodeCache = require('node-cache');
+
+// Cache configuration
+const cache = new NodeCache({
+    stdTTL: 3600, // Cache for 1 hour
+    checkperiod: 600 // Check for expired entries every 10 minutes
+});
 
 class MusicService {
     constructor() {
@@ -9,6 +16,14 @@ class MusicService {
 
     async findLyrics(artist, track) {
         try {
+            // Check cache first
+            const cacheKey = `lyrics:${artist}:${track}`;
+            const cached = cache.get(cacheKey);
+            if (cached) {
+                console.log('Returning cached lyrics');
+                return cached;
+            }
+
             const response = await axios.get(`https://api.genius.com/search`, {
                 headers: {
                     'Authorization': `Bearer ${this.geniusApiKey}`
@@ -43,7 +58,7 @@ class MusicService {
                     .replace(/\n{3,}/g, '\n\n') // Reduce multiple newlines to double
                     .trim();
 
-                return {
+                const result = {
                     success: true,
                     data: {
                         title: songInfo.title,
@@ -53,6 +68,12 @@ class MusicService {
                         lyrics: lyrics || "Lyrics not available"
                     }
                 };
+
+                // Cache the results
+                cache.set(cacheKey, result);
+                console.log(`Found and cached lyrics for ${artist} - ${track}`);
+
+                return result;
             }
             
             return {
@@ -71,6 +92,14 @@ class MusicService {
 
     async getArtistInfo(artist) {
         try {
+            // Check cache first
+            const cacheKey = `artist:${artist}`;
+            const cached = cache.get(cacheKey);
+            if (cached) {
+                console.log('Returning cached artist info');
+                return cached;
+            }
+
             const response = await axios.get(`http://ws.audioscrobbler.com/2.0/`, {
                 params: {
                     method: 'artist.getInfo',
@@ -82,7 +111,8 @@ class MusicService {
 
             if (response.data.artist) {
                 const artistInfo = response.data.artist;
-                return {
+
+                const result = {
                     success: true,
                     data: {
                         name: artistInfo.name,
@@ -98,6 +128,12 @@ class MusicService {
                         }
                     }
                 };
+
+                // Cache the results
+                cache.set(cacheKey, result);
+                console.log(`Found and cached artist info for ${artist}`);
+
+                return result;
             }
 
             return {
@@ -116,6 +152,14 @@ class MusicService {
 
     async getTrackInfo(artist, track) {
         try {
+            // Check cache first
+            const cacheKey = `track:${artist}:${track}`;
+            const cached = cache.get(cacheKey);
+            if (cached) {
+                console.log('Returning cached track info');
+                return cached;
+            }
+
             const response = await axios.get(`http://ws.audioscrobbler.com/2.0/`, {
                 params: {
                     method: 'track.getInfo',
@@ -128,7 +172,8 @@ class MusicService {
 
             if (response.data.track) {
                 const trackInfo = response.data.track;
-                return {
+
+                const result = {
                     success: true,
                     data: {
                         name: trackInfo.name,
@@ -140,6 +185,12 @@ class MusicService {
                         tags: trackInfo.toptags?.tag?.map(t => t.name) || []
                     }
                 };
+
+                // Cache the results
+                cache.set(cacheKey, result);
+                console.log(`Found and cached track info for ${artist} - ${track}`);
+
+                return result;
             }
 
             return {
@@ -170,7 +221,7 @@ class MusicService {
             .replace(/\[Lyrics\]/i, '')
             .trim();
 
-        console.log(cleanTitle);
+        // console.log(cleanTitle);
 
         const parts = cleanTitle.split('-').map(part => part.trim());
         

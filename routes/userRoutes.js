@@ -3,7 +3,7 @@ const router = express.Router();
 const userController = require("../controllers/userController");
 
 /**
- * @route   GET /user/{user_id}/find-all-playlists
+ * @route   GET /users/{user_id}/find-all-playlists
  * @desc    Find all playlists under specific user
  * @params  user_id
  */

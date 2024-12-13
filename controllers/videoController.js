@@ -1,4 +1,4 @@
-const ytdl = require('ytdl-core');
+//const ytdl = require('ytdl-core');
 const ytDlp = require('yt-dlp-exec');
 const db = require('../config/db');
 const { video, playlist } = db.models;
@@ -7,6 +7,14 @@ const path = require('path');
 const fs = require('fs').promises;
 const os = require('os');
 const { uploadToCloud, deleteFromCloud } = require('../config/cloudinary');
+const { google } = require('googleapis');
+require('dotenv').config();
+
+// Initialize YouTube API client
+const youtube = google.youtube({
+    version: 'v3',
+    auth: process.env.YOUTUBE_API_KEY
+});
 
 module.exports = {
     downloadVideo: async (req, res) => {
@@ -20,9 +28,21 @@ module.exports = {
                 });
             }
 
-            // Get video info
-            const videoInfo = await ytdl.getInfo(url);
-            const videoTitle = videoInfo.videoDetails.title.replace(/[^\w\s]/gi, '');
+            // Get video info using YouTube API
+            const videoInfo = await youtube.videos.list({
+                part: ['snippet', 'contentDetails'],
+                id: [new URL(url).searchParams.get('v')]
+            });
+
+            if (!videoInfo.data.items || videoInfo.data.items.length === 0) {
+                return res.status(404).json({ 
+                    success: false,
+                    message: 'Video not found' 
+                });
+            }
+
+            const videoDetails = videoInfo.data.items[0];
+            const videoTitle = videoDetails.snippet.title.replace(/[^\w\s]/gi, '');
 
             // Get playlist name
             const playlistInfo = await playlist.findByPk(playlist_id);
@@ -39,51 +59,68 @@ module.exports = {
 
             const videoPath = path.join(downloadDir, `${videoTitle}.mp4`);
 
-            // Download video using yt-dlp
-            try {
-                await ytDlp(url, {
-                    output: videoPath,
-                    format: 'best[ext=mp4]'
-                });
+            const formatStrategies = [
+                'mp4',
+                'bv[height<=720][ext=mp4]+ba[ext=m4a]',
+            ];            
 
-                // Upload to Cloudinary
-                let cloudData = null;
+            let downloadSuccess = false;
+
+            for (const formatStrategy of formatStrategies) {
                 try {
-                    cloudData = await uploadToCloud(videoPath, `VideoHub/${playlistInfo.playlist_name}`);
+
+                    console.log(`Downloading video with strategy: ${formatStrategy}`);
+                    await ytDlp(url, {
+                        output: videoPath,
+                        format: formatStrategy,
+                        // mergeOutputFormat: 'mp4',
+                    });
+                    console.log('Video downloaded successfully');
+
+                    downloadSuccess = true;
+                    break;
                 } catch (error) {
-                    console.error('Cloud upload failed:', error);
-                    // Continue with local storage only
+                    console.warn(`Download attempt with ${formatStrategy} failed:`, error.message);
                 }
-
-                // Save to database
-                const videoRecord = await video.create({
-                    user_id: 1,
-                    playlist_id: playlist_id,
-                    video_name: videoTitle,
-                    link: url,
-                    video_path: videoPath,
-                    cloud_url: cloudData?.url || null,
-                    cloud_public_id: cloudData?.public_id || null,
-                    downloaded: true,
-                    thumbnail: videoInfo.videoDetails.thumbnails[0]?.url || null,
-                    duration: videoInfo.videoDetails.lengthSeconds
-                });
-
-                res.status(200).json({
-                    success: true,
-                    message: cloudData ? "Video downloaded and uploaded to cloud" : "Video downloaded locally",
-                    video: videoRecord
-                });
-
-            } catch (error) {
-                return res.status(402).json({
-                    success: false, 
-                    message: "Video download failed",
-                    error: error.message
-                });
             }
 
+            if (!downloadSuccess) {
+                throw new Error('Could not download video with any format strategy');
+            }
+
+            // Upload to Cloudinary using the final video path
+            let cloudData = null;
+            try {
+                cloudData = await uploadToCloud(
+                    videoPath, 
+                    `VideoHub/User ${playlistInfo.user_id}/${playlistInfo.playlist_name}`
+                );
+            } catch (error) {
+                console.error('Cloud upload failed:', error);
+            }
+
+            // Save to database
+            const videoRecord = await video.create({
+                user_id: 1,
+                playlist_id: playlist_id,
+                video_name: videoTitle,
+                link: url,
+                video_path: videoPath,
+                cloud_url: cloudData?.url || null,
+                cloud_public_id: cloudData?.public_id || null,
+                downloaded: true,
+                thumbnail: videoDetails.snippet.thumbnails.high.url || null,
+                duration: parseInt(videoDetails.contentDetails.duration.split('PT')[1].split('S')[0])
+            });
+
+            res.status(200).json({
+                success: true,
+                message: cloudData ? "Video downloaded and uploaded to cloud" : "Video downloaded locally",
+                video: videoRecord
+            });
+
         } catch (error) {
+            console.error('Download error:', error);
             res.status(500).json({
                 success: false,
                 message: error.message
@@ -127,19 +164,57 @@ module.exports = {
                 });
             }
 
-            const videoInfo = await ytdl.getInfo(url);
-            
+            // Extract video ID from URL
+            const videoId = new URL(url).searchParams.get('v');
+
+            if (!videoId) {
+                return res.status(400).json({ 
+                    success: false,
+                    message: "Invalid YouTube URL" 
+                });
+            }
+
+            // Fetch video details from YouTube API
+            const { data } = await youtube.videos.list({
+                part: ['snippet', 'contentDetails', 'statistics'],
+                id: [videoId]
+            });
+
+            if (!data.items || data.items.length === 0) {
+                return res.status(404).json({ 
+                    success: false,
+                    message: 'Video not found' 
+                });
+            }
+
+            const videoDetails = data.items[0];
+
+            // Get additional details from ytdl-core for formats
+            /* const ytdlInfo = await ytdl.getInfo(url); */
+
+            // Parse duration from ISO 8601 format
+            const parseDuration = (duration) => {
+                const match = duration.match(/PT(\d+H)?(\d+M)?(\d+S)?/);
+                const hours = parseInt(match[1]) || 0;
+                const minutes = parseInt(match[2]) || 0;
+                const seconds = parseInt(match[3]) || 0;
+                return hours * 3600 + minutes * 60 + seconds;
+            };
+
             const info = {
-                title: videoInfo.videoDetails.title,
-                duration: videoInfo.videoDetails.lengthSeconds,
-                thumbnail: videoInfo.videoDetails.thumbnails[0]?.url || null,
-                author: videoInfo.videoDetails.author.name,
-                views: videoInfo.videoDetails.viewCount,
-                formats: videoInfo.formats.map(format => ({
+                title: videoDetails.snippet.title,
+                description: videoDetails.snippet.description,
+                duration: parseDuration(videoDetails.contentDetails.duration),
+                thumbnail: videoDetails.snippet.thumbnails.high.url,
+                author: videoDetails.snippet.channelTitle,
+                views: parseInt(videoDetails.statistics.viewCount),
+                likes: parseInt(videoDetails.statistics.likeCount),
+                publishedAt: videoDetails.snippet.publishedAt,
+                /*formats: ytdlInfo.formats.map(format => ({
                     quality: format.qualityLabel,
                     container: format.container,
                     size: format.contentLength
-                }))
+                }))*/
             };
 
             res.status(200).json({
@@ -147,9 +222,11 @@ module.exports = {
                 info: info
             });
         } catch (error) {
-            res.status(500).json({
+            console.error('Error fetching video info:', error);
+            res.status(500).json({ 
                 success: false,
-                message: error.message
+                message: 'Failed to retrieve video information',
+                details: error.message 
             });
         }
     },
@@ -207,6 +284,7 @@ module.exports = {
             const updatedVideo = await video.update(
                 {
                     video_name: video_name,
+                    video_path: path.join(os.homedir(), `Downloads/VideoHub/Music/${video_name}.mp4`),
                     updated_at: new Date()
                 },
                 {

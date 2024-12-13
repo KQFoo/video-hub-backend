@@ -55,5 +55,51 @@ module.exports = {
                 error: error.message
             });
         }
+    },
+
+    getLyrics: async (req, res) => {
+        try {
+            const { video_id } = req.params;
+            
+            const videoInfo = await video.findByPk(video_id, {
+                where: {
+                    playlist_id: 1 // Hardcoded playlist ID for music
+                }
+            });
+            if (!videoInfo) {
+                return res.status(404).json({
+                    success: false,
+                    message: "Video not found"
+                });
+            }
+
+            // Extract artist and track from video name
+            const songInfo = musicService.extractArtistAndTrack(videoInfo.video_name);
+            if (!songInfo) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Could not extract artist and track information from video title"
+                });
+            }
+
+            // Fetch lyrics
+            const lyrics = await musicService.findLyrics(songInfo.artist, songInfo.track);
+
+            res.status(200).json({
+                success: true,
+                video_id: video_id,
+                video_name: videoInfo.video_name,
+                extracted_info: songInfo,
+                lyrics: lyrics.data
+            });
+
+        } catch (error) {
+            console.error('Error in getLyrics:', error);
+            res.status(500).json({
+                success: false,
+                message: "Error retrieving lyrics",
+                error: error.message
+            });
+        }
     }
 };

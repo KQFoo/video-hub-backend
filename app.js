@@ -43,7 +43,7 @@ io.on('connection', (socket) => {
 const PORT = process.env.PORT || 8080;
 httpServer.listen(PORT, (err) => {
     if (err) {
-        console.error("Error in running server");
+        console.error("\nError in running server");
     }
-    console.log(`Server is running on http://localhost:${PORT}`);
+    console.log(`\nServer is running on http://localhost:${PORT}`);
 });
