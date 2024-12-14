@@ -1,5 +1,6 @@
 //const ytdl = require('ytdl-core');
-const ytDlp = require('yt-dlp-exec');
+//const ytDlp = require('yt-dlp-exec');
+const ytdlp = require('ytdlp-nodejs');
 const db = require('../config/db');
 const { video, playlist } = db.models;
 const { Op } = require("sequelize");
@@ -57,44 +58,48 @@ module.exports = {
             const downloadDir = path.join(os.homedir(), 'Downloads/VideoHub', playlistInfo.playlist_name);
             await fs.mkdir(downloadDir, { recursive: true });
 
-            const videoPath = path.join(downloadDir, `${videoTitle}.mp4`);
-
-            const formatStrategies = [
-                'mp4',
-                'bv[height<=720][ext=mp4]+ba[ext=m4a]',
-            ];            
+            // const formatStrategies = [
+            //     'mp4',
+            //     'bv[height<=720][ext=mp4]+ba[ext=m4a]',
+            // ];            
 
             let downloadSuccess = false;
 
-            for (const formatStrategy of formatStrategies) {
-                try {
+            try {
+                ytdlp.download(url, {
+                    filter: "mergevideo",
+                    quality: "360p",
+                    format: "webm",
+                    output: {
+                        fileName: videoTitle + ".mp4",
+                        outDir: downloadDir
+                    }   
+                })
+                .on('progress', (data) => {
+                    console.log(data);
+                });
 
-                    console.log(`Downloading video with strategy: ${formatStrategy}`);
-                    await ytDlp(url, {
-                        output: videoPath,
-                        format: formatStrategy,
-                        // mergeOutputFormat: 'mp4',
-                    });
-                    console.log('Video downloaded successfully');
-
-                    downloadSuccess = true;
-                    break;
-                } catch (error) {
-                    console.warn(`Download attempt with ${formatStrategy} failed:`, error.message);
-                }
+                downloadSuccess = true;
+            } catch (error) {
+                console.error(`Download attempt failed:`, error.message);
             }
 
             if (!downloadSuccess) {
-                throw new Error('Could not download video with any format strategy');
+                throw new Error('Could not download video with any format');
             }
+
+            const videoPath = path.join(downloadDir, `${videoTitle}.mp4.webm`); // hardcoded title: name.mp4.webm
 
             // Upload to Cloudinary using the final video path
             let cloudData = null;
             try {
-                cloudData = await uploadToCloud(
-                    videoPath, 
-                    `VideoHub/User ${playlistInfo.user_id}/${playlistInfo.playlist_name}`
-                );
+                while (cloudData === null) {
+                    await new Promise(resolve => setTimeout(resolve, 10000));
+                    cloudData = await uploadToCloud(
+                        videoPath, 
+                        `VideoHub/User ${playlistInfo.user_id}/${playlistInfo.playlist_name}`
+                    );
+                }
             } catch (error) {
                 console.error('Cloud upload failed:', error);
             }
@@ -343,7 +348,7 @@ module.exports = {
                 });
             }
 
-            const updatedCount = await video.update(
+            await video.update(
                 {
                     views: videoInfo.views + 1,
                     last_watched: new Date(),
@@ -353,13 +358,6 @@ module.exports = {
                     where: { video_id: video_id }
                 }
             );
-
-            if (updatedCount === 0) {
-                return res.status(400).json({
-                    success: false,
-                    message: "View count not updated"
-                });
-            }
 
             const updatedVideo = await video.findByPk(video_id);
             

@@ -17,18 +17,11 @@ router.get("/info", videoController.fetchVideoInfo);
 router.get("/:video_id/info", videoController.getVideoInfo);
 
 /**
- * @route   POST /videos/download
- * @desc    Download the video
- * @body    url={youtube_url}, playlist_id={playlist_id}
- */
-router.post("/download", videoController.downloadVideo);
-
-/**
  * @route   GET /videos/{video_id}/display
  * @desc    Display the video
  * @params  video_id
  */
-router.get("/:video_id/display", videoController.displayVideo);
+router.get("/display/:video_id", videoController.displayVideo);
 
 /**
  * @route   PUT /videos/{video_id}/rename
@@ -36,7 +29,7 @@ router.get("/:video_id/display", videoController.displayVideo);
  * @params  video_id
  * @body    video_name={video_name}
  */
-router.put("/:video_id/rename", videoController.renameVideo);
+router.put("/rename/:video_id", videoController.renameVideo);
 
 /**
  * @route   GET /videos/{video_id}/cloud-url

@@ -6,6 +6,7 @@ const videoRoutes = require("./videoRoutes");
 const userRoutes = require("./userRoutes");
 const playlistRoutes = require("./playlistRoutes");
 const musicRoutes = require("./musicRoutes");
+const downloadRoutes = require("./downloadRoutes");
 const recommendationRoutes = require('./recommendationRoutes');
 
 // Default Main
@@ -17,6 +18,7 @@ router.use("/videos", videoRoutes);                   // Video Routes
 router.use("/users", userRoutes);                     // User Routes
 router.use("/playlists", playlistRoutes);             // Playlist Routes
 router.use("/music", musicRoutes);                    // Music Info Routes
+router.use("/v", downloadRoutes);                     // Download Video Routes
 router.use('/recommendations', recommendationRoutes); // Recommendation Routes
 
 // Standard CRUD Routes for all models

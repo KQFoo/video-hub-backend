@@ -74,7 +74,11 @@ module.exports = {
             }
 
             if (videos.length === 0) {
-                return res.status(404).json({ message: "No videos were found" });
+                return res.status(404).json({ 
+                    success: false,
+                    data: [],
+                    message: "No videos were found in this playlist" 
+                });
             }
 
             res.status(200).json({
