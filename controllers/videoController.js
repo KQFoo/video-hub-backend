@@ -17,6 +17,18 @@ const youtube = google.youtube({
     auth: process.env.YOUTUBE_API_KEY
 });
 
+function Str_Random(length) {
+    let result = '';
+    const characters = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    
+    // Loop to generate characters for the specified length
+    for (let i = 0; i < length; i++) {
+        const randomInd = Math.floor(Math.random() * characters.length);
+        result += characters.charAt(randomInd);
+    }
+    return result;
+}
+
 module.exports = {
     downloadVideo: async (req, res) => {
         try {
@@ -90,18 +102,41 @@ module.exports = {
 
             const videoPath = path.join(downloadDir, `${videoTitle}.mp4.webm`); // hardcoded title: name.mp4.webm
 
-            // Upload to Cloudinary using the final video path
             let cloudData = null;
             try {
-                while (cloudData === null) {
-                    await new Promise(resolve => setTimeout(resolve, 10000));
-                    cloudData = await uploadToCloud(
-                        videoPath, 
-                        `VideoHub/User ${playlistInfo.user_id}/${playlistInfo.playlist_name}`
-                    );
+                const maxRetries = 3;
+                let retryCount = 0;
+
+                while (!cloudData && retryCount < maxRetries) {
+                    // Exponential backoff
+                    const waitTime = Math.pow(2, retryCount) * 120000; // 2min, 4min, 8min
+                    
+                    console.log(`Cloud upload attempt ${retryCount + 1}. Waiting ${waitTime/1000} seconds.`);
+                    await new Promise(resolve => setTimeout(resolve, waitTime));
+
+                    try {
+                        cloudData = await uploadToCloud(
+                            videoPath, 
+                            `VideoHub/User ${playlistInfo.user_id}/${playlistInfo.playlist_name}`
+                        );
+
+                        if (cloudData) {
+                            console.log('Cloud upload successful');
+                            break; // Exit loop on successful upload
+                        }
+                    } catch (uploadError) {
+                        console.error(`Cloud upload attempt ${retryCount + 1} failed:`, uploadError);
+                    }
+
+                    retryCount++;
+                }
+
+                // Throw error if all attempts fail
+                if (!cloudData) {
+                    throw new Error('Failed to upload video to cloud after multiple attempts');
                 }
             } catch (error) {
-                console.error('Cloud upload failed:', error);
+                console.error('Cloud upload ultimately failed:', error);
             }
 
             // Save to database
@@ -110,6 +145,7 @@ module.exports = {
                 playlist_id: playlist_id,
                 video_name: videoTitle,
                 link: url,
+                v_random_id: Str_Random(12),
                 video_path: videoPath,
                 cloud_url: cloudData?.url || null,
                 cloud_public_id: cloudData?.public_id || null,

@@ -10,8 +10,8 @@ const youtube = google.youtube({
 
 // Cache configuration
 const cache = new NodeCache({
-    stdTTL: 3600, // Cache for 1 hour
-    checkperiod: 600 // Check for expired entries every 10 minutes
+    stdTTL: 36000, // Cache for 10 hours
+    checkperiod: 6000 // Check for expired entries every 100 minutes
 });
 
 // Retry configuration

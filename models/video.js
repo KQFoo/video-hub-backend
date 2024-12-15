@@ -23,6 +23,10 @@ module.exports = function (sequelize, DataTypes) {
                 key: "playlist_id",
             },
         },
+        v_random_id: {
+            type: DataTypes.STRING(255),
+            allowNull: false
+        },
         video_name: {
             type: DataTypes.STRING(255),
             allowNull: false
