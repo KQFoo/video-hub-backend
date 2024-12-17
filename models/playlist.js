@@ -33,7 +33,7 @@ module.exports = function (sequelize, DataTypes) {
         ,
         indexes: [
             {
-                name: "PRIMARY",
+                name: "PRIMARY_PLAYLIST",
                 unique: true,
                 using: "BTREE",
                 fields: [

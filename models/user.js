@@ -36,7 +36,7 @@ module.exports = function (sequelize, DataTypes) {
         ,
         indexes: [
             {
-                name: "PRIMARY",
+                name: "PRIMARY_USER",
                 unique: true,
                 using: "BTREE",
                 fields: [

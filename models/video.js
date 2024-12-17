@@ -79,7 +79,7 @@ module.exports = function (sequelize, DataTypes) {
         ,
         indexes: [
             {
-                name: "PRIMARY",
+                name: "PRIMARY_VIDEO",
                 unique: true,
                 using: "BTREE",
                 fields: [
