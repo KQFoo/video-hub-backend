@@ -75,7 +75,7 @@ module.exports = {
             }
 
             // Create downloads directory structure
-            const downloadDir = path.join(os.homedir(), 'Downloads/VideoHub', playlistInfo.playlist_name);
+            const downloadDir = path.join(os.homedir(), 'VideoHub', playlistInfo.playlist_name);
             await fs.mkdir(downloadDir, { recursive: true });
 
             // const formatStrategies = [
@@ -110,42 +110,42 @@ module.exports = {
 
             const videoPath = path.join(downloadDir, `${videoTitle}.mp4.webm`); // hardcoded title: name.mp4.webm
 
-            let cloudData = null;
-            try {
-                const maxRetries = 3;
-                let retryCount = 0;
+            // let cloudData = null;
+            // try {
+            //     const maxRetries = 3;
+            //     let retryCount = 0;
 
-                while (!cloudData && retryCount < maxRetries) {
-                    // Exponential backoff
-                    const waitTime = Math.pow(2, retryCount) * 120000; // 2min, 4min, 8min
+            //     while (!cloudData && retryCount < maxRetries) {
+            //         // Exponential backoff
+            //         const waitTime = Math.pow(2, retryCount) * 120000; // 2min, 4min, 8min
                     
-                    console.log(`Cloud upload attempt ${retryCount + 1}. Waiting ${waitTime/1000} seconds.`);
-                    await new Promise(resolve => setTimeout(resolve, waitTime));
+            //         console.log(`Cloud upload attempt ${retryCount + 1}. Waiting ${waitTime/1000} seconds.`);
+            //         await new Promise(resolve => setTimeout(resolve, waitTime));
 
-                    try {
-                        cloudData = await uploadToCloud(
-                            videoPath, 
-                            `VideoHub/User ${playlistInfo.user_id}/${playlistInfo.playlist_name}`
-                        );
+            //         try {
+            //             cloudData = await uploadToCloud(
+            //                 videoPath, 
+            //                 `VideoHub/User ${playlistInfo.user_id}/${playlistInfo.playlist_name}`
+            //             );
 
-                        if (cloudData) {
-                            console.log('Cloud upload successful');
-                            break; // Exit loop on successful upload
-                        }
-                    } catch (uploadError) {
-                        console.error(`Cloud upload attempt ${retryCount + 1} failed:`, uploadError);
-                    }
+            //             if (cloudData) {
+            //                 console.log('Cloud upload successful');
+            //                 break; // Exit loop on successful upload
+            //             }
+            //         } catch (uploadError) {
+            //             console.error(`Cloud upload attempt ${retryCount + 1} failed:`, uploadError);
+            //         }
 
-                    retryCount++;
-                }
+            //         retryCount++;
+            //     }
 
-                // Throw error if all attempts fail
-                if (!cloudData) {
-                    throw new Error('Failed to upload video to cloud after multiple attempts');
-                }
-            } catch (error) {
-                console.error('Cloud upload ultimately failed:', error);
-            }
+            //     // Throw error if all attempts fail
+            //     if (!cloudData) {
+            //         throw new Error('Failed to upload video to cloud after multiple attempts');
+            //     }
+            // } catch (error) {
+            //     console.error('Cloud upload ultimately failed:', error);
+            // }
 
             // Save to database
             const videoRecord = await video.create({
