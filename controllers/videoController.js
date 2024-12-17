@@ -110,7 +110,7 @@ module.exports = {
 
             const videoPath = path.join(downloadDir, `${videoTitle}.mp4.webm`); // hardcoded title: name.mp4.webm
 
-            // let cloudData = null;
+            let cloudData = null;
             // try {
             //     const maxRetries = 3;
             //     let retryCount = 0;
