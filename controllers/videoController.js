@@ -2,7 +2,7 @@
 //const ytDlp = require('yt-dlp-exec');
 const ytdlp = require('ytdlp-nodejs');
 const db = require('../config/db');
-const { video, playlist } = db.models;
+const { video, playlist, user } = db.models;
 const { Op } = require("sequelize");
 const path = require('path');
 const fs = require('fs').promises;
@@ -32,12 +32,20 @@ function Str_Random(length) {
 module.exports = {
     downloadVideo: async (req, res) => {
         try {
-            const { url, playlist_id } = req.body;
+            const { url, playlist_id, username, email } = req.body;
 
             if(!url) {
                 return res.status(400).json({
                     success: false, 
                     message: "URL is required"
+                });
+            }
+
+            const _user = await user.findOne({ where: { user_name: username, email: email } });
+            if (!_user) {
+                return res.status(400).json({
+                    success: false, 
+                    message: "User not found"
                 });
             }
 
@@ -141,7 +149,7 @@ module.exports = {
 
             // Save to database
             const videoRecord = await video.create({
-                user_id: 1,
+                user_id: _user.user_id,
                 playlist_id: playlist_id,
                 video_name: videoTitle,
                 link: url,
@@ -421,8 +429,20 @@ module.exports = {
 
     retrieveOld: async (req, res) => {
         try {
+
+            const { username, email } = req.body;
+
+            const _user = await user.findOne({ where: { user_name: username, email: email } });
+            if (!_user) {
+                return res.status(400).json({
+                    success: false,
+                    message: "User not found"
+                });
+            }
+
             const videos = await video.findAll({
                 where: {
+                    user_id: _user.user_id,
                     downloaded: true,
                     last_watched: { [Op.lt]: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) }
                 },

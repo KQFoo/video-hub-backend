@@ -9,7 +9,7 @@ const playlistController = require("../controllers/playlistController");
 router.get("/:id/total-videos", playlistController.showTotalVideos);
 
 /**
- * @route   GET /playlists/{playlist_id}/find-all-videos
+ * @route   POST /playlists/{playlist_id}/find-all-videos
  * @desc    Find all videos under specific playlist
  * @params  playlist_id
  * @query   filter - default/custom =>
@@ -19,6 +19,6 @@ router.get("/:id/total-videos", playlistController.showTotalVideos);
  *                      -> ltom: 'least viewed to most viewed', 
  *                      -> oton: 'oldest to newest'
  */
-router.get("/:id/find-all-videos", playlistController.findAllVideos);
+router.post("/:id/find-all-videos", playlistController.findAllVideos);
 
 module.exports = router;

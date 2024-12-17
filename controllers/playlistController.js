@@ -1,5 +1,5 @@
 const db = require('../config/db');
-const { playlist, video } = db.models;
+const { playlist, video, user } = db.models;
 
 module.exports = {
     showTotalVideos: async (req, res) => {
@@ -44,6 +44,7 @@ module.exports = {
     findAllVideos: async (req, res) => {
         try {
             const playlist_id = req.params.id;
+            const { username, email } = req.body;
             const filter = req.query.filter || 'default'; // default, mtol, ltom, oton
 
             const _playlist = await playlist.findByPk(playlist_id);
@@ -53,23 +54,32 @@ module.exports = {
                 return res.status(400).json({ message: "Playlist not found" });
             }
 
+            const _user = await user.findOne({ where: { user_name: username, email: email } });
+
+            // Check if user exists or not
+            if (!_user) {
+                return res.status(400).json({ message: "User not found" });
+            }
+
+            const user_id = _user.user_id;
+
             let videos = [];
 
             switch (filter) {
                 case 'default':
-                    videos = await video.findAll({ where: { playlist_id: playlist_id }, order: [['created_at', 'DESC']] });
+                    videos = await video.findAll({ where: { playlist_id: playlist_id, user_id: user_id }, order: [['created_at', 'DESC']] });
                     break;
                 case 'mtol':
-                    videos = await video.findAll({ where: { playlist_id: playlist_id }, order: [['views', 'DESC']] });
+                    videos = await video.findAll({ where: { playlist_id: playlist_id, user_id: user_id }, order: [['views', 'DESC']] });
                     break;
                 case 'ltom':
-                    videos = await video.findAll({ where: { playlist_id: playlist_id }, order: [['views', 'ASC']] });
+                    videos = await video.findAll({ where: { playlist_id: playlist_id, user_id: user_id }, order: [['views', 'ASC']] });
                     break;
                 case 'oton':
-                    videos = await video.findAll({ where: { playlist_id: playlist_id }, order: [['created_at', 'ASC']] });
+                    videos = await video.findAll({ where: { playlist_id: playlist_id, user_id: user_id }, order: [['created_at', 'ASC']] });
                     break;
                 default:
-                    videos = await video.findAll({ where: { playlist_id: playlist_id }, order: [['created_at', 'DESC']] });
+                    videos = await video.findAll({ where: { playlist_id: playlist_id, user_id: user_id }, order: [['created_at', 'DESC']] });
                     break;
             }
 

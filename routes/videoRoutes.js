@@ -60,10 +60,10 @@ router.get("/search", videoController.searchVideo);
 router.put("/:video_id/increment-view", videoController.incrementView);
 
 /**
- * @route   GET /videos/retrieve-old
+ * @route   POST /videos/retrieve-old
  * @desc    Retrieve old videos
  */
-router.get("/retrieve-old", videoController.retrieveOld);
+router.post("/retrieve-old", videoController.retrieveOld);
 
 /**
  * @route   DELETE /videos/{video_id}/delete

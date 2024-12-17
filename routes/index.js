@@ -15,7 +15,7 @@ router.get("/", (req, res) => {
 });
 
 router.use("/videos", videoRoutes);                   // Video Routes
-router.use("/users", userRoutes);                     // User Routes
+router.use("/user", userRoutes);                     // User Routes
 router.use("/playlists", playlistRoutes);             // Playlist Routes
 router.use("/music", musicRoutes);                    // Music Info Routes
 router.use("/v", downloadRoutes);                     // Download Video Routes

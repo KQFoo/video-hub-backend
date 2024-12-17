@@ -39,6 +39,6 @@ const syncDatabase = async () => {
     }
 };
 
-// syncDatabase();
+syncDatabase();
 
 module.exports = { sequelize, models };
