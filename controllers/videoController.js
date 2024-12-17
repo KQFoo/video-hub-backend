@@ -75,7 +75,7 @@ module.exports = {
             }
 
             // Create downloads directory structure
-            const downloadDir = path.join(os.homedir(), 'VideoHub', playlistInfo.playlist_name);
+            const downloadDir = path.join('C:\\VideoHub', playlistInfo.playlist_name);
             await fs.mkdir(downloadDir, { recursive: true });
 
             // const formatStrategies = [
@@ -99,7 +99,7 @@ module.exports = {
                     console.log(data);
                 });
 
-                downloadSuccess = true;
+                //downloadSuccess = true;
             } catch (error) {
                 console.error(`Download attempt failed:`, error.message);
             }
