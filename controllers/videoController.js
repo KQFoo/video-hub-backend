@@ -59,7 +59,7 @@ module.exports = {
             }
 
             // Get video info using YouTube API
-            const videoInfo = await youtube.videos.list({
+            const videoInfo = youtube.videos.list({
                 part: ['snippet', 'contentDetails'],
                 id: [new URL(url).searchParams.get('v')]
             });
