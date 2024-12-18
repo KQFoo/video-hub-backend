@@ -24,6 +24,16 @@ app.use((req, res, next) => {
     res.header("Access-Control-Allow-Origin", '*');
     res.header("Access-Control-Allow-Methods", "OPTIONS, GET, POST, PUT, PATCH, DELETE");
     res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    
+    // Add Content Security Policy headers
+    res.header("Content-Security-Policy", 
+        "default-src 'self'; " +
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
+        "style-src 'self' 'unsafe-inline'; " +
+        "img-src 'self' data:; " +
+        "connect-src 'self';"
+    );
+    
     if (req.method === "OPTIONS") {
       return res.sendStatus(200);
     }
