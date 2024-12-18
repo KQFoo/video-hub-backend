@@ -280,47 +280,28 @@ module.exports = {
         }
     },
 
-    // More secure streaming method
     displayVideo: async (req, res) => {
         try {
             const { video_id } = req.params;
+
             const videoInfo = await video.findByPk(video_id);
-            
             if (!videoInfo) {
                 return res.status(404).json({
                     success: false,
                     message: "Video not found"
                 });
             }
-    
-            const stat = await fs.stat(videoInfo.video_path);
-            const fileSize = stat.size;
-            const range = req.headers.range;
-    
-            if (range) {
-                const parts = range.replace(/bytes=/, "").split("-");
-                const start = parseInt(parts[0], 10);
-                const end = parts[1] ? parseInt(parts[1], 10) : fileSize-1;
-                
-                const chunksize = (end-start)+1;
-                const file = fs.createReadStream(videoInfo.video_path, {start, end});
-                const head = {
-                    'Content-Range': `bytes ${start}-${end}/${fileSize}`,
-                    'Accept-Ranges': 'bytes',
-                    'Content-Length': chunksize,
-                    'Content-Type': 'video/mp4',
-                };
-                
-                res.writeHead(206, head);
-                file.pipe(res);
-            } else {
-                const head = {
-                    'Content-Length': fileSize,
-                    'Content-Type': 'video/mp4',
-                };
-                res.writeHead(200, head);
-                fs.createReadStream(videoInfo.video_path).pipe(res);
+
+            try {
+                await fs.access(videoInfo.video_path);
+            } catch (error) {
+                return res.status(404).json({
+                    success: false,
+                    message: "Video not found"
+                });
             }
+
+            res.status(200).download(videoInfo.video_path);
         } catch (error) {
             res.status(500).json({
                 success: false,
@@ -345,7 +326,7 @@ module.exports = {
             const updatedVideo = await video.update(
                 {
                     video_name: video_name,
-                    video_path: path.join(os.homedir(), `Downloads/VideoHub/Music/${video_name}.mp4`),
+                    video_path: path.join('C:\\', `VideoHub/${videoInfo.playlist.playlist_name}/${video_name}`),
                     updated_at: new Date()
                 },
                 {
