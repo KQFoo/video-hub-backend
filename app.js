@@ -15,8 +15,6 @@ const io = new Server(httpServer, {
 });
 
 // Enable CORS
-const cors = require('cors');
-
 app.use(cors({
     origin: ['https://video-hub-frontend.onrender.com'],
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
