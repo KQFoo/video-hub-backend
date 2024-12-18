@@ -29,6 +29,18 @@ function Str_Random(length) {
     return result;
 }
 
+const generateVideoPath = (playlistName, videoName) => {
+    // Use a more universal path that works across different environments
+    const baseVideoDir = process.env.VIDEO_STORAGE_PATH || path.join(os.tmpdir(), 'VideoHub');
+    
+    // Ensure the directory exists
+    if (!fs.existsSync(baseVideoDir)) {
+        fs.mkdirSync(baseVideoDir, { recursive: true });
+    }
+
+    return path.join(baseVideoDir, playlistName, videoName);
+};
+
 module.exports = {
     downloadVideo: async (req, res) => {
         try {
@@ -74,14 +86,13 @@ module.exports = {
                 });
             }
 
-            // Create downloads directory structure
-            const downloadDir = path.join('C:\\VideoHub', playlistInfo.playlist_name);
-            await fs.mkdir(downloadDir, { recursive: true });
-
             // const formatStrategies = [
             //     'mp4',
             //     'bv[height<=720][ext=mp4]+ba[ext=m4a]',
             // ];            
+
+            const videoPath = generateVideoPath(playlistInfo.playlist_name, videoTitle + ".mp4.webm");
+            const downloadPath = process.env.VIDEO_STORAGE_PATH || path.join(os.tmpdir(), 'VideoHub');
 
             let downloadSuccess = false;
 
@@ -92,7 +103,7 @@ module.exports = {
                     format: "webm",
                     output: {
                         fileName: videoTitle + ".mp4",
-                        outDir: downloadDir
+                        outDir: downloadPath
                     }   
                 })
                 .on('progress', (data) => {
@@ -107,8 +118,6 @@ module.exports = {
             if (!downloadSuccess) {
                 throw new Error('Could not download video with any format');
             }
-
-            const videoPath = path.join(downloadDir, `${videoTitle}.mp4.webm`); // hardcoded title: name.mp4.webm
 
             let cloudData = null;
             // try {
@@ -283,7 +292,7 @@ module.exports = {
     displayVideo: async (req, res) => {
         try {
             const { video_id } = req.params;
-
+    
             const videoInfo = await video.findByPk(video_id);
             if (!videoInfo) {
                 return res.status(404).json({
@@ -291,24 +300,42 @@ module.exports = {
                     message: "Video not found"
                 });
             }
-
-            try {
-                await fs.access(videoInfo.video_path);
-            } catch (error) {
-                return res.status(404).json({
-                    success: false,
-                    message: "Video not found"
-                });
+            
+            const path = videoInfo.video_path;
+            const stat = fs.statSync(path);
+            const fileSize = stat.size;
+            const range = req.headers.range;
+    
+            if (range) {
+                const parts = range.replace(/bytes=/, "").split("-");
+                const start = parseInt(parts[0], 10);
+                const end = parts[1] ? parseInt(parts[1], 10) : fileSize-1;
+                const chunksize = (end-start)+1;
+                const file = fs.createReadStream(path, {start, end});
+                const head = {
+                    'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+                    'Accept-Ranges': 'bytes',
+                    'Content-Length': chunksize,
+                    'Content-Type': 'video/mp4',
+                };
+                res.writeHead(206, head);
+                file.pipe(res);
+            } else {
+                const head = {
+                    'Content-Length': fileSize,
+                    'Content-Type': 'video/webm',
+                };
+                res.writeHead(200, head);
+                fs.createReadStream(path).pipe(res);
             }
-
-            res.status(200).download(videoInfo.video_path);
         } catch (error) {
+            console.error('Video display error:', error);
             res.status(500).json({
                 success: false,
                 message: error.message
             });
         }
-    },
+    },    
 
     renameVideo: async (req, res) => {
         try {
@@ -326,7 +353,7 @@ module.exports = {
             const updatedVideo = await video.update(
                 {
                     video_name: video_name,
-                    video_path: path.join('C:\\', `VideoHub/${videoInfo.playlist.playlist_name}/${video_name}`),
+                    video_path: generateVideoPath(videoInfo.playlist.playlist_name, video_name),
                     updated_at: new Date()
                 },
                 {
@@ -337,7 +364,7 @@ module.exports = {
             // Rename local file if it exists
             try {
                 await fs.access(videoInfo.video_path);
-                await fs.rename(videoInfo.video_path, path.join(os.homedir(), `Downloads/VideoHub/Music/${video_name}.mp4`));
+                await fs.rename(videoInfo.video_path, generateVideoPath(videoInfo.playlist.playlist_name, video_name));
             } catch (error) {
                 return res.status(404).json({
                     success: false,

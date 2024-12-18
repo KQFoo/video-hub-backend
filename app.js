@@ -15,7 +15,13 @@ const io = new Server(httpServer, {
 });
 
 // Enable CORS
-app.use(cors());
+const cors = require('cors');
+
+app.use(cors({
+    origin: ['https://video-hub-frontend.onrender.com'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
 
 // Parse JSON bodies
 app.use(express.json());
