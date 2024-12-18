@@ -16,7 +16,9 @@ const io = new Server(httpServer, {
 
 const cors = require('cors');
 
-app.use(cors());
+app.use(cors({
+    origin: 'https://video-hub-frontend.onrender.com',
+  }));
 
 app.use((req, res, next) => {
     res.setHeader("Access-Control-Allow-Origin", 'https://video-hub-frontend.onrender.com');
