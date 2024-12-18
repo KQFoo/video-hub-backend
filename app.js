@@ -27,13 +27,15 @@ app.use((req, res, next) => {
     
     // Add Content Security Policy headers
     res.header("Content-Security-Policy", 
-        "default-src 'self'; " +
-        "script-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
-        "style-src 'self' 'unsafe-inline'; " +
-        "img-src 'self' data:; " +
-        "connect-src 'self';"
+        "default-src 'self' https:; " +
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://video-hub-backend.onrender.com; " +
+        "style-src 'self' 'unsafe-inline' https://video-hub-backend.onrender.com; " +
+        "img-src 'self' data: https:; " +
+        "connect-src 'self' https://video-hub-backend.onrender.com; " +
+        "frame-src 'self' https:; " +
+        "font-src 'self' https:;"
     );
-    
+
     if (req.method === "OPTIONS") {
       return res.sendStatus(200);
     }
