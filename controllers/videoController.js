@@ -33,10 +33,7 @@ const generateVideoPath = (playlistName, videoName) => {
     // Use a more universal path that works across different environments
     const baseVideoDir = process.env.VIDEO_STORAGE_PATH || path.join(os.tmpdir(), 'VideoHub');
     
-    // Ensure the directory exists
-    if (!fs.existsSync(baseVideoDir)) {
-        fs.mkdirSync(baseVideoDir, { recursive: true });
-    }
+    fs.mkdir(baseVideoDir, { recursive: true });
 
     return path.join(baseVideoDir, playlistName, videoName);
 };
