@@ -305,20 +305,16 @@ module.exports = {
                     message: "Video not found"
                 });
             }
-            
-            const path = videoInfo.video_path;
 
-            // Check if file exists
-            try {
-                await fs.access(path);
-            } catch (error) {
+            const playlistInfo = await playlist.findByPk(videoInfo.playlist_id);
+            if (!playlistInfo) {
                 return res.status(404).json({
                     success: false,
-                    message: "Video not found"
+                    message: "Playlist not found"
                 });
             }
 
-            res.status(200).sendFile(path, (err) => {
+            res.status(200).sendFile(path.join(process.cwd(), `Downloads/VideoHub/${playlistInfo.playlist_name}`, `${videoInfo.video_name}`), (err) => {
                 if (err) {
                     console.error('Video display error:', err);
                     res.status(500).json({
