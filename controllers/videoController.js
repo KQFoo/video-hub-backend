@@ -89,12 +89,12 @@ module.exports = {
             // ];            
 
             // Use environment variable for base path
-            const downloadPath = process.env.VIDEO_STORAGE_PATH || path.join(os.tmpdir(), 'VideoHub');
+            // const downloadPath = process.env.VIDEO_STORAGE_PATH || path.join(os.tmpdir(), 'VideoHub');
             
             // Ensure download directory exists
-            await fs.mkdir(path.join(downloadPath, playlistInfo.playlist_name), { recursive: true });
+            // await fs.mkdir(path.join(downloadPath, playlistInfo.playlist_name), { recursive: true });
 
-            const videoPath = generateVideoPath(playlistInfo.playlist_name, `${videoTitle}.mp4.webm`);
+            // const videoPath = generateVideoPath(playlistInfo.playlist_name, `${videoTitle}.mp4.webm`);
 
             let downloadSuccess = false;
 
@@ -105,7 +105,7 @@ module.exports = {
                     format: "webm",
                     output: {
                         fileName: videoTitle + ".mp4",
-                        outDir: downloadPath
+                        outDir: `VideoHub/${playlistInfo.playlist_name}`
                     }   
                 })
                 .on('progress', (data) => {
@@ -165,7 +165,7 @@ module.exports = {
                 video_name: videoTitle,
                 link: url,
                 v_random_id: Str_Random(12),
-                video_path: videoPath,
+                video_path: `VideoHub/${playlistInfo.playlist_name}/${videoTitle}.mp4.webm`,
                 cloud_url: cloudData?.url || null,
                 cloud_public_id: cloudData?.public_id || null,
                 downloaded: true,
