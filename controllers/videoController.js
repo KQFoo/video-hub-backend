@@ -205,7 +205,7 @@ module.exports = {
                 }); 
             }
 
-            let videoList = null;
+            let videoList = [];
             try {
                 videoList = await fs.readdir(folder_path);
             } catch (error) {
