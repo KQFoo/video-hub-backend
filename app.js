@@ -19,8 +19,15 @@ const io = new Server(httpServer, {
 app.use(cors({
     origin: ['https://video-hub-frontend.onrender.com'],
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Origin', 'X-Requested-With', 'Accept']
+    allowedHeaders: ['Content-Type', 'Authorization', 'Origin', 'X-Requested-With', 'Accept'],
+    credentials: true
 }));
+
+// Add these before your route definitions
+app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Credentials', 'true');
+    next();
+});
 
 // Parse JSON bodies
 app.use(express.json());
