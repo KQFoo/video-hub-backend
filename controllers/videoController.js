@@ -318,7 +318,7 @@ module.exports = {
                     'Content-Range': `bytes ${start}-${end}/${fileSize}`,
                     'Accept-Ranges': 'bytes',
                     'Content-Length': chunksize,
-                    'Content-Type': 'video/mp4',
+                    'Content-Type': 'video/webm',
                 };
                 res.writeHead(206, head);
                 file.pipe(res);
