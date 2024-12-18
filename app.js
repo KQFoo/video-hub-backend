@@ -15,22 +15,22 @@ const io = new Server(httpServer, {
     }
 });
 
-// Extremely permissive CORS configuration
+const allowedOrigins = ['https://video-hub-frontend.onrender.com/'];
 app.use(cors({
-    origin: '*', // Allow all origins
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['*'], // Allow all headers
-    credentials: true
+  origin: function(origin, callback){
+    if (!origin) {
+      return callback(null, true);
+    }
+
+    if (allowedOrigins.includes(origin)) {
+      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+      return callback(new Error(msg), false);
+    }
+    return callback(null, true);
+  }
+
 }));
 
-// Additional headers to ensure maximum compatibility
-app.use((req, res, next) => {
-    res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
-    res.header('Access-Control-Allow-Headers', '*');
-    res.header('Access-Control-Allow-Credentials', 'true');
-    next();
-});
 
 // Parse JSON bodies
 app.use(express.json());
