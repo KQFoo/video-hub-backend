@@ -5,7 +5,7 @@ const db = require('../config/db');
 const { video, playlist, user } = db.models;
 const { Op } = require("sequelize");
 const path = require('path');
-const fs = require('fs');
+const fs = require('fs').promises;
 const os = require('os');
 const { uploadToCloud, deleteFromCloud } = require('../config/cloudinary');
 const { google } = require('googleapis');
@@ -29,13 +29,11 @@ function Str_Random(length) {
     return result;
 }
 
-const generateVideoPath = (playlistName, videoName) => {
-    // Use a more universal path that works across different environments
-    const baseVideoDir = process.env.VIDEO_STORAGE_PATH || path.join(os.tmpdir(), 'VideoHub');
-    
-    fs.mkdir(baseVideoDir, { recursive: true });
+const generateVideoPath = async(playlistName, videoName) => {
+    const downloadDir = path.join(os.homedir(), 'Downloads/VideoHub', `${playlistName}`);
+    await fs.mkdir(downloadDir, { recursive: true });
 
-    return path.join(baseVideoDir, playlistName, videoName);
+    return path.join(downloadDir, videoName);
 };
 
 module.exports = {
@@ -96,32 +94,56 @@ module.exports = {
 
             // const videoPath = generateVideoPath(playlistInfo.playlist_name, `${videoTitle}.mp4.webm`);
 
-            let downloadSuccess = false;
+            const downloadDir = path.join(os.homedir(), 'Downloads/VideoHub', `${playlistInfo.playlist_name}`);
+            await fs.mkdir(downloadDir, { recursive: true });
+
+            // let downloadSuccess = false;
+            let cloudData = null;
 
             try {
-                ytdlp.download(url, {
+                await ytdlp.download(url, {
                     filter: "mergevideo",
                     quality: "360p",
                     format: "webm",
                     output: {
                         fileName: videoTitle + ".mp4",
-                        // outDir: `VideoHub/${playlistInfo.playlist_name}`
+                        outDir: downloadDir
                     }   
+
                 })
                 .on('progress', (data) => {
                     console.log(data);
                 });
 
-                downloadSuccess = true;
+                // downloadSuccess = true;
+
+                const videoRecord = await video.create({
+                    user_id: _user.user_id,
+                    playlist_id: playlist_id,
+                    video_name: videoTitle,
+                    link: url,
+                    v_random_id: Str_Random(12),
+                    video_path: downloadDir + '/' + videoTitle + '.mp4.webm',
+                    cloud_url: cloudData?.url || null,
+                    cloud_public_id: cloudData?.public_id || null,
+                    downloaded: true,
+                    thumbnail: videoDetails.snippet.thumbnails.high.url || null,
+                    duration: parseInt(videoDetails.contentDetails.duration.split('PT')[1].split('S')[0])
+                });
+
+                res.status(200).json({
+                    success: true,
+                    message: cloudData ? "Video downloaded and uploaded to cloud" : "Video downloaded locally",
+                    video: videoRecord
+                });
             } catch (error) {
                 console.error(`Download attempt failed:`, error.message);
             }
 
-            if (!downloadSuccess) {
-                throw new Error('Could not download video with any format');
-            }
+            // if (!downloadSuccess) {
+            //     throw new Error('Could not download video with any format');
+            // }
 
-            let cloudData = null;
             // try {
             //     const maxRetries = 3;
             //     let retryCount = 0;
@@ -159,25 +181,6 @@ module.exports = {
             // }
 
             // Save to database
-            const videoRecord = await video.create({
-                user_id: _user.user_id,
-                playlist_id: playlist_id,
-                video_name: videoTitle,
-                link: url,
-                v_random_id: Str_Random(12),
-                video_path: `C:/VideoHub/${playlistInfo.playlist_name}/${videoTitle}.mp4.webm`,
-                cloud_url: cloudData?.url || null,
-                cloud_public_id: cloudData?.public_id || null,
-                downloaded: true,
-                thumbnail: videoDetails.snippet.thumbnails.high.url || null,
-                duration: parseInt(videoDetails.contentDetails.duration.split('PT')[1].split('S')[0])
-            });
-
-            res.status(200).json({
-                success: true,
-                message: cloudData ? "Video downloaded and uploaded to cloud" : "Video downloaded locally",
-                video: videoRecord
-            });
 
         } catch (error) {
             console.error('Download error:', error);
@@ -304,32 +307,26 @@ module.exports = {
             }
             
             const path = videoInfo.video_path;
-            const stat = fs.statSync(path);
-            const fileSize = stat.size;
-            const range = req.headers.range;
-    
-            if (range) {
-                const parts = range.replace(/bytes=/, "").split("-");
-                const start = parseInt(parts[0], 10);
-                const end = parts[1] ? parseInt(parts[1], 10) : fileSize-1;
-                const chunksize = (end-start)+1;
-                const file = fs.createReadStream(path, {start, end});
-                const head = {
-                    'Content-Range': `bytes ${start}-${end}/${fileSize}`,
-                    'Accept-Ranges': 'bytes',
-                    'Content-Length': chunksize,
-                    'Content-Type': 'video/webm',
-                };
-                res.writeHead(206, head);
-                file.pipe(res);
-            } else {
-                const head = {
-                    'Content-Length': fileSize,
-                    'Content-Type': 'video/webm',
-                };
-                res.writeHead(200, head);
-                fs.createReadStream(path).pipe(res);
+
+            // Check if file exists
+            try {
+                await fs.access(path);
+            } catch (error) {
+                return res.status(404).json({
+                    success: false,
+                    message: "Video not found"
+                });
             }
+
+            res.status(200).sendFile(path, (err) => {
+                if (err) {
+                    console.error('Video display error:', err);
+                    res.status(500).json({
+                        success: false,
+                        message: err.message
+                    });
+                }
+            });
         } catch (error) {
             console.error('Video display error:', error);
             res.status(500).json({
@@ -352,10 +349,20 @@ module.exports = {
                 });
             }
 
+            const playlistInfo = await playlist.findByPk(videoInfo.playlist_id);
+            if (!playlistInfo) {
+                return res.status(404).json({
+                    success: false,
+                    message: "Playlist not found"
+                });
+            }
+
+            const newPath = path.join(os.homedir(), 'Downloads/VideoHub', `${playlistInfo.playlist_name}`, `${video_name}.webm`);
+
             const updatedVideo = await video.update(
                 {
                     video_name: video_name,
-                    video_path: generateVideoPath(videoInfo.playlist.playlist_name, video_name),
+                    video_path: newPath,
                     updated_at: new Date()
                 },
                 {
@@ -366,7 +373,7 @@ module.exports = {
             // Rename local file if it exists
             try {
                 await fs.access(videoInfo.video_path);
-                await fs.rename(videoInfo.video_path, generateVideoPath(videoInfo.playlist.playlist_name, video_name));
+                await fs.rename(videoInfo.video_path, newPath);
             } catch (error) {
                 return res.status(404).json({
                     success: false,
@@ -395,6 +402,7 @@ module.exports = {
                 }
             });
         } catch (error) {
+            console.log('Video rename error:', error);
             res.status(500).json({
                 success: false,
                 message: error.message
