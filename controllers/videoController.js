@@ -191,6 +191,75 @@ module.exports = {
         }
     },
 
+    accessFolder: async (req, res) => {
+        try {
+            const { folder_path, playlist_id, username, email, videoTitle, url, videoDetails } = req.body;
+
+            const _user = await user.findOne({ where: { user_name: username, email: email } });
+            if (!_user) {
+                return res.status(400).json({
+                    success: false, 
+                    message: "User not found"
+                });
+            }  
+
+            const playlistInfo = await playlist.findByPk(playlist_id);
+            if(!playlistInfo) {
+                return res.status(401).json({
+                    success: false, 
+                    message: "Playlist not found"
+                }); 
+            }
+
+            let videoList = null;
+            try {
+                videoList = await fs.readdir(folder_path);
+            } catch (error) {
+                return res.status(404).json({
+                    success: false,
+                    message: "Folder not found"
+                });
+            }
+
+            const videoRecords = await Promise.all(videoList.map(async (videoName) => {
+                try {
+                    return await video.create({
+                        user_id: _user.user_id,
+                        playlist_id: playlist_id,
+                        video_name: videoName,
+                        link: url,
+                        v_random_id: Str_Random(12),
+                        video_path: path.join(folder_path, videoName),
+                        cloud_url: null,
+                        cloud_public_id: null,
+                        downloaded: true,
+                        thumbnail: null,
+                        duration: null
+                    });
+                } catch (createError) {
+                    console.error(`Error creating video record for ${videoName}:`, createError);
+                    return null;
+                }
+            }));
+
+            const successfulVideoRecords = videoRecords.filter(record => record !== null);
+
+            res.status(200).json({
+                success: true,
+                message: "Folder accessed successfully",
+                videos: videoRecords,
+                totalVideos: videoList.length,
+                createdVideos: successfulVideoRecords.length,
+            });
+
+        } catch (error) {
+            res.status(500).json({
+                success: false,
+                message: error.message
+            });
+        }
+    },
+
     getVideoInfo: async (req, res) => {
         try {
             const { video_id } = req.params;

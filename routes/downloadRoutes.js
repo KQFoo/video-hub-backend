@@ -9,4 +9,11 @@ const videoController = require("../controllers/videoController");
  */
 router.post("/download", videoController.downloadVideo);
 
+/**
+ * @route   POST /v/access
+ * @desc    Access the videos from specific folder
+ * @body    folder_path={folder_path}, playlist_id={playlist_id}, username={username}, email={email}
+ */
+router.post("/access", videoController.accessVideo);
+
 module.exports = router;
