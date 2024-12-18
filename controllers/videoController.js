@@ -88,8 +88,13 @@ module.exports = {
             //     'bv[height<=720][ext=mp4]+ba[ext=m4a]',
             // ];            
 
-            const videoPath = generateVideoPath(playlistInfo.playlist_name, videoTitle + ".mp4.webm");
+            // Use environment variable for base path
             const downloadPath = process.env.VIDEO_STORAGE_PATH || path.join(os.tmpdir(), 'VideoHub');
+            
+            // Ensure download directory exists
+            await fs.mkdir(path.join(downloadPath, playlistInfo.playlist_name), { recursive: true });
+
+            const videoPath = generateVideoPath(playlistInfo.playlist_name, `${videoTitle}.mp4.webm`);
 
             let downloadSuccess = false;
 

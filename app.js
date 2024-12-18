@@ -1,3 +1,5 @@
+require("dotenv").config();
+
 const express = require('express');
 const cors = require('cors');
 const { createServer } = require('http');
@@ -5,7 +7,6 @@ const { Server } = require('socket.io');
 const app = express();
 const mainRouter = require("./routes/index");
 require("./config/db"); // Running database
-require("dotenv").config();
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
     cors: {
@@ -17,8 +18,7 @@ const io = new Server(httpServer, {
 // Enable CORS
 app.use(cors({
     origin: ['https://video-hub-frontend.onrender.com'],
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
-    allowedHeaders: ['Content-Type', 'Authorization']
+    methods: ['GET', 'POST', 'PUT', 'DELETE']
 }));
 
 // Parse JSON bodies
