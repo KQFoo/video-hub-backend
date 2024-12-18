@@ -1,5 +1,6 @@
 //const ytdl = require('ytdl-core');
 //const ytDlp = require('yt-dlp-exec');
+require('dotenv').config();
 const ytdlp = require('ytdlp-nodejs');
 const db = require('../config/db');
 const { video, playlist, user } = db.models;
@@ -9,7 +10,6 @@ const fs = require('fs').promises;
 const os = require('os');
 const { uploadToCloud, deleteFromCloud } = require('../config/cloudinary');
 const { google } = require('googleapis');
-require('dotenv').config();
 
 // Initialize YouTube API client
 const youtube = google.youtube({
@@ -133,7 +133,7 @@ module.exports = {
 
                 res.status(200).json({
                     success: true,
-                    message: cloudData ? "Video downloaded and uploaded to cloud" : "Video downloaded locally",
+                    message: "Video downloaded locally",
                     video: videoRecord
                 });
             } catch (error) {
