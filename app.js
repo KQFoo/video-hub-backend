@@ -31,6 +31,11 @@ app.use(cors({
 
 }));
 
+app.use((req, res, next) => {
+  res.set('Access-Control-Allow-Origin', 'https://video-hub-frontend.onrender.com');
+  res.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE');
+  next();
+});
 
 // Parse JSON bodies
 app.use(express.json());
