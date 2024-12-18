@@ -15,26 +15,51 @@ const io = new Server(httpServer, {
     }
 });
 
-const allowedOrigins = ['https://video-hub-frontend.onrender.com/'];
-app.use(cors({
-  origin: function(origin, callback){
-    if (!origin) {
-      return callback(null, true);
-    }
+// Define allowed origins
+const allowedOrigins = [
+    'https://video-hub-frontend.onrender.com',
+    'http://localhost:5173'
+];
 
-    if (allowedOrigins.includes(origin)) {
-      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
-      return callback(new Error(msg), false);
-    }
-    return callback(null, true);
-  }
+// CORS configuration
+const corsOptions = {
+    origin: function (origin, callback) {
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: [
+        'Content-Type', 
+        'Authorization', 
+        'Origin', 
+        'X-Requested-With', 
+        'Accept'
+    ],
+    credentials: true,
+    optionsSuccessStatus: 200
+};
 
-}));
+// Apply CORS middleware
+app.use(cors(corsOptions));
 
+// Additional headers middleware
 app.use((req, res, next) => {
-  res.set('Access-Control-Allow-Origin', 'https://video-hub-frontend.onrender.com');
-  res.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE');
-  next();
+    // Set CORS headers explicitly
+    res.header('Access-Control-Allow-Origin', req.headers.origin || allowedOrigins[0]);
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Origin, X-Requested-With, Accept');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    
+    // Handle preflight requests
+    if (req.method === 'OPTIONS') {
+        return res.sendStatus(200);
+    }
+    
+    next();
 });
 
 // Parse JSON bodies
