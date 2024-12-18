@@ -369,15 +369,7 @@ module.exports = {
                 });
             }
 
-            res.status(200).sendFile(videoInfo.video_path), (err) => {
-                if (err) {
-                    console.error('Video display error:', err);
-                    res.status(500).json({
-                        success: false,
-                        message: err.message
-                    });
-                }
-            };
+            res.status(200).sendFile(videoInfo.video_path);
         } catch (error) {
             console.error('Video display error:', error);
             res.status(500).json({
