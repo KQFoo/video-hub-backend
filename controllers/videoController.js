@@ -29,12 +29,6 @@ function Str_Random(length) {
     return result;
 }
 
-const generateVideoPath = async(playlistName, videoName) => {
-    const downloadDir = path.join(os.homedir(), 'Downloads/VideoHub', `${playlistName}`);
-    await fs.mkdir(downloadDir, { recursive: true });
-
-    return path.join(downloadDir, videoName);
-};
 
 module.exports = {
     downloadVideo: async (req, res) => {
@@ -193,7 +187,7 @@ module.exports = {
 
     accessFolder: async (req, res) => {
         try {
-            const { folder_path, playlist_id, username, email, videoTitle, url, videoDetails } = req.body;
+            const { folder_path, playlist_id, username, email } = req.body;
 
             const _user = await user.findOne({ where: { user_name: username, email: email } });
             if (!_user) {
@@ -226,8 +220,8 @@ module.exports = {
                     return await video.create({
                         user_id: _user.user_id,
                         playlist_id: playlist_id,
-                        video_name: videoName,
-                        link: url,
+                        video_name: videoName.split('.')[0], // remove extension
+                        link: null,
                         v_random_id: Str_Random(12),
                         video_path: path.join(folder_path, videoName),
                         cloud_url: null,
@@ -375,15 +369,7 @@ module.exports = {
                 });
             }
 
-            const playlistInfo = await playlist.findByPk(videoInfo.playlist_id);
-            if (!playlistInfo) {
-                return res.status(404).json({
-                    success: false,
-                    message: "Playlist not found"
-                });
-            }
-
-            res.status(200).sendFile(path.join(process.cwd(), `Downloads/VideoHub/${playlistInfo.playlist_name}`, `${videoInfo.video_name}`), (err) => {
+            res.status(200).sendFile(videoInfo.video_path), (err) => {
                 if (err) {
                     console.error('Video display error:', err);
                     res.status(500).json({
@@ -391,7 +377,7 @@ module.exports = {
                         message: err.message
                     });
                 }
-            });
+            };
         } catch (error) {
             console.error('Video display error:', error);
             res.status(500).json({
@@ -422,7 +408,11 @@ module.exports = {
                 });
             }
 
-            const newPath = path.join(os.homedir(), 'Downloads/VideoHub', `${playlistInfo.playlist_name}`, `${video_name}.webm`);
+            // Get the directory path
+            const oldPath = videoInfo.video_path;
+            const videoDir = path.dirname(oldPath);
+
+            const newPath = path.join(videoDir, `${video_name}.mp4`);
 
             const updatedVideo = await video.update(
                 {
@@ -437,8 +427,8 @@ module.exports = {
 
             // Rename local file if it exists
             try {
-                await fs.access(videoInfo.video_path);
-                await fs.rename(videoInfo.video_path, newPath);
+                await fs.access(oldPath);
+                await fs.rename(oldPath, newPath);
             } catch (error) {
                 return res.status(404).json({
                     success: false,

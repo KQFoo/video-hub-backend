@@ -14,6 +14,6 @@ router.post("/download", videoController.downloadVideo);
  * @desc    Access the videos from specific folder
  * @body    folder_path={folder_path}, playlist_id={playlist_id}, username={username}, email={email}
  */
-router.post("/access", videoController.accessVideo);
+router.post("/access", videoController.accessFolder);
 
 module.exports = router;

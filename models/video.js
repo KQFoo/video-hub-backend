@@ -33,7 +33,7 @@ module.exports = function (sequelize, DataTypes) {
         },
         link: {
             type: DataTypes.STRING(255),
-            allowNull: false
+            allowNull: true
         },
         video_path: {
             type: DataTypes.STRING(255),
@@ -56,11 +56,11 @@ module.exports = function (sequelize, DataTypes) {
         },
         thumbnail: {
             type: DataTypes.STRING(255),
-            allowNull: false
+            allowNull: true
         },
         duration: {
             type: DataTypes.INTEGER,
-            allowNull: false
+            allowNull: true
         },
         cloud_url: {
             type: DataTypes.STRING(255),
