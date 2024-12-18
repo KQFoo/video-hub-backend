@@ -105,7 +105,7 @@ module.exports = {
                     format: "webm",
                     output: {
                         fileName: videoTitle + ".mp4",
-                        outDir: `VideoHub/${playlistInfo.playlist_name}`
+                        // outDir: `VideoHub/${playlistInfo.playlist_name}`
                     }   
                 })
                 .on('progress', (data) => {
@@ -165,7 +165,7 @@ module.exports = {
                 video_name: videoTitle,
                 link: url,
                 v_random_id: Str_Random(12),
-                video_path: `VideoHub/${playlistInfo.playlist_name}/${videoTitle}.mp4.webm`,
+                video_path: `C:/VideoHub/${playlistInfo.playlist_name}/${videoTitle}.mp4.webm`,
                 cloud_url: cloudData?.url || null,
                 cloud_public_id: cloudData?.public_id || null,
                 downloaded: true,
