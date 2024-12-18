@@ -15,16 +15,19 @@ const io = new Server(httpServer, {
     }
 });
 
-// Enable CORS
+// Extremely permissive CORS configuration
 app.use(cors({
-    origin: ['https://video-hub-frontend.onrender.com'],
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Origin', 'X-Requested-With', 'Accept'],
+    origin: '*', // Allow all origins
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['*'], // Allow all headers
     credentials: true
 }));
 
-// Add these before your route definitions
+// Additional headers to ensure maximum compatibility
 app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
+    res.header('Access-Control-Allow-Headers', '*');
     res.header('Access-Control-Allow-Credentials', 'true');
     next();
 });
