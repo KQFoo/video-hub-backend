@@ -21,4 +21,10 @@ router.get("/:id/total-videos", playlistController.showTotalVideos);
  */
 router.post("/:id/find-all-videos", playlistController.findAllVideos);
 
+/**
+ * @route   GET /playlists/{playlist_id}/videos
+ * @desc    Find all videos under specific playlist
+ */
+router.get("/:playlist_id/videos", playlistController.getPlaylistVideos);
+
 module.exports = router;

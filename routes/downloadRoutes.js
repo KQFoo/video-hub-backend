@@ -5,7 +5,7 @@ const videoController = require("../controllers/videoController");
 /**
  * @route   POST /v/download
  * @desc    Download the video
- * @body    url={youtube_url}, playlist_id={playlist_id}
+ * @body    url={youtube_url}, playlist_id={playlist_id}, username={username}, email={email}
  */
 router.post("/download", videoController.downloadVideo);
 

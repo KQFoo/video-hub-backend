@@ -3,6 +3,13 @@ const router = express.Router();
 const videoController = require("../controllers/videoController");
 
 /**
+ * @rourte  POST /videos/upload-cloud
+ * @desc    Upload video to cloud
+ * @body    url={url}, playlist_id={playlist_id}, username={username}, email={email}
+ */
+router.post("/upload-cloud", videoController.downloadVideoIntoCloud);
+
+/**
  * @route   GET /videos/info?url={youtube_url}
  * @desc    Fetch original video info
  * @query   youtube_url

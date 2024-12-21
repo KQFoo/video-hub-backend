@@ -1,6 +1,6 @@
-//const ytdl = require('ytdl-core');
-//const ytDlp = require('yt-dlp-exec');
 require('dotenv').config();
+//const ytdl = require('ytdl-core');
+const ytDlp = require('yt-dlp-exec');
 const ytdlp = require('ytdlp-nodejs');
 const db = require('../config/db');
 const { video, playlist, user } = db.models;
@@ -10,6 +10,7 @@ const fs = require('fs').promises;
 const os = require('os');
 const { uploadToCloud, deleteFromCloud } = require('../config/cloudinary');
 const { google } = require('googleapis');
+const NodeCache = require('node-cache');
 
 // Initialize YouTube API client
 const youtube = google.youtube({
@@ -17,11 +18,16 @@ const youtube = google.youtube({
     auth: process.env.YOUTUBE_API_KEY
 });
 
+// Cache configuration
+const cache = new NodeCache({
+    stdTTL: 36000, // Cache for 10 hours
+    checkperiod: 6000 // Check for expired entries every 100 minutes
+});
+
 function Str_Random(length) {
     let result = '';
     const characters = 'abcdefghijklmnopqrstuvwxyz0123456789';
     
-    // Loop to generate characters for the specified length
     for (let i = 0; i < length; i++) {
         const randomInd = Math.floor(Math.random() * characters.length);
         result += characters.charAt(randomInd);
@@ -86,57 +92,86 @@ module.exports = {
             // Ensure download directory exists
             // await fs.mkdir(path.join(downloadPath, playlistInfo.playlist_name), { recursive: true });
 
-            // const videoPath = generateVideoPath(playlistInfo.playlist_name, `${videoTitle}.mp4.webm`);
+            const downloadDir = `src/VideoHub/${playlistInfo.playlist_name}`;
+            const videoPath = path.join(downloadDir, `${videoTitle}.mp4.webm`);
 
-            const downloadDir = path.join(os.homedir(), 'Downloads/VideoHub', `${playlistInfo.playlist_name}`);
-            await fs.mkdir(downloadDir, { recursive: true });
-
-            // let downloadSuccess = false;
+            let downloadSuccess = false;
             let cloudData = null;
 
             try {
-                await ytdlp.download(url, {
-                    filter: "mergevideo",
-                    quality: "360p",
-                    format: "webm",
-                    output: {
-                        fileName: videoTitle + ".mp4",
-                        outDir: downloadDir
-                    }   
+                // await ytdlp.download(url, {
+                //     filter: "mergevideo",
+                //     quality: "360p",
+                //     format: "webm",
+                //     output: {
+                //         fileName: videoTitle + ".mp4",
+                //         outDir: downloadDir
+                //     }   
 
-                })
-                .on('progress', (data) => {
-                    console.log(data);
-                });
+                // })
+                // .on('progress', (data) => {
+                //     console.log(data);
+                // });
 
-                // downloadSuccess = true;
+                // const youtubeDownload = await ytDlp(url, {
+                //     output: downloadDir,
+                //     format: 'ba'
+                // });
 
-                const videoRecord = await video.create({
-                    user_id: _user.user_id,
-                    playlist_id: playlist_id,
-                    video_name: videoTitle,
-                    link: url,
-                    v_random_id: Str_Random(12),
-                    video_path: downloadDir + '/' + videoTitle + '.mp4.webm',
-                    cloud_url: cloudData?.url || null,
-                    cloud_public_id: cloudData?.public_id || null,
-                    downloaded: true,
-                    thumbnail: videoDetails.snippet.thumbnails.high.url || null,
-                    duration: parseInt(videoDetails.contentDetails.duration.split('PT')[1].split('S')[0])
-                });
+                // await ytdlp.download(url, {
+                //     filter: "mergevideo",
+                //     quality: "360p",
+                //     format: "webm",
+                //     output: {
+                //         fileName: videoTitle + ".mp4",
+                //         outDir: downloadDir
+                //     }
+                // })
+                // .on('progress', (data) => {
+                //     console.log(data);
+                // });
 
-                res.status(200).json({
-                    success: true,
-                    message: "Video downloaded locally",
-                    video: videoRecord
-                });
+                try {
+                    while (cloudData === null) {
+                        await new Promise(resolve => setTimeout(resolve, 120000));
+                        cloudData = await uploadToCloud(url, `VideoHub/User_${playlistInfo.user_id}/${playlistInfo.playlist_name}`);
+                    }
+                    if(cloudData) {
+                        downloadSuccess = true;
+                    }
+                } catch (error) {
+                    downloadSuccess = false;
+                    console.error('Cloud upload failed:', error);
+                }
+
+                downloadSuccess = true;
             } catch (error) {
                 console.error(`Download attempt failed:`, error.message);
             }
 
-            // if (!downloadSuccess) {
-            //     throw new Error('Could not download video with any format');
-            // }
+            if (!downloadSuccess) {
+                 throw new Error('Could not download video with any format');
+            }
+
+            const videoRecord = await video.create({
+                user_id: _user.user_id,
+                playlist_id: playlist_id,
+                video_name: videoTitle,
+                link: url,
+                v_random_id: Str_Random(12),
+                video_path: cloudData?.url || null,
+                cloud_url: cloudData?.url || null,
+                cloud_public_id: cloudData?.public_id || null,
+                downloaded: true,
+                thumbnail: videoDetails.snippet.thumbnails.high.url || null,
+                duration: parseInt(videoDetails.contentDetails.duration.split('PT')[1].split('S')[0])
+            });
+
+            res.status(200).json({
+                success: true,
+                message: "Video downloaded locally",
+                video: videoRecord
+            });
 
             // try {
             //     const maxRetries = 3;
@@ -185,6 +220,118 @@ module.exports = {
         }
     },
 
+    downloadVideoIntoCloud: async (req, res) => {
+        try {
+            const { url, playlist_id, username, email } = req.body;
+
+            if(!url) {
+                return res.status(400).json({
+                    success: false, 
+                    message: "URL is required"
+                });
+            }
+
+            const _user = await user.findOne({ where: { user_name: username, email: email } });
+            if (!_user) {
+                return res.status(400).json({
+                    success: false, 
+                    message: "User not found"
+                });
+            }
+
+            // Get video info using YouTube API
+            const videoInfo = await youtube.videos.list({
+                part: ['snippet', 'contentDetails'],
+                id: [new URL(url).searchParams.get('v')]
+            });
+
+            if (!videoInfo.data.items || videoInfo.data.items.length === 0) {
+                return res.status(404).json({ 
+                    success: false,
+                    message: 'Video not found' 
+                });
+            }
+
+            const videoDetails = videoInfo.data.items[0];
+            const videoTitle = videoDetails.snippet.title.replace(/[^\w\s]/gi, '');
+
+            // Get playlist name
+            const playlistInfo = await playlist.findByPk(playlist_id);
+            if(!playlistInfo) {
+                return res.status(401).json({
+                    success: false, 
+                    message: "Playlist not found"
+                });
+            }
+
+            let cloudData = null;
+
+            const videoRecord = await video.create({
+                user_id: _user.user_id,
+                playlist_id: playlist_id,
+                video_name: videoTitle,
+                link: url,
+                v_random_id: Str_Random(12),
+                video_path: '',
+                cloud_url: cloudData?.url || null,
+                cloud_public_id: cloudData?.public_id || null,
+                downloaded: true,
+                thumbnail: videoDetails.snippet.thumbnails.high.url || null,
+                duration: parseInt(videoDetails.contentDetails.duration.split('PT')[1].split('S')[0])
+            });
+
+            // let cloudData = null;
+
+            // try {
+            //     const maxRetries = 3;
+            //     let retryCount = 0;
+
+            //     while (!cloudData && retryCount < maxRetries) {
+            //         // Exponential backoff
+            //         const waitTime = Math.pow(2, retryCount) * 120000; // 2min, 4min, 8min
+                    
+            //         console.log(`Cloud upload attempt ${retryCount + 1}. Waiting ${waitTime/1000} seconds.`);
+            //         await new Promise(resolve => setTimeout(resolve, waitTime));
+
+            //         try {
+            //             cloudData = await uploadToCloud(
+            //                 url, 
+            //                 `VideoHub/User ${playlistInfo.user_id}/${playlistInfo.playlist_name}`
+            //             );
+
+            //             if (cloudData) {
+            //                 console.log('Cloud upload successful');
+            //                 break;
+            //             }
+            //         } catch (uploadError) {
+            //             console.error(`Cloud upload attempt ${retryCount + 1} failed:`, uploadError);
+            //         }
+
+            //         retryCount++;
+            //     }
+
+            //     if (!cloudData) {
+            //         throw new Error('Failed to upload video to cloud after multiple attempts');
+            //     }
+            // } catch (error) {
+            //     console.error('Cloud upload ultimately failed:', error);
+            // }
+
+            res.status(200).json({
+                success: true,
+                message: 'Video downloaded successfully!',
+                data: videoRecord
+            });
+
+        } catch (error) {
+            console.error('Download error:', error);
+            res.status(500).json({
+                success: false,
+                message: error.message
+            });
+        }
+    },
+
     accessFolder: async (req, res) => {
         try {
             const { folder_path, playlist_id, username, email } = req.body;
@@ -215,41 +362,68 @@ module.exports = {
                 });
             }
 
-            const videoRecords = await Promise.all(videoList.map(async (videoName) => {
-                try {
-                    return await video.create({
-                        user_id: _user.user_id,
-                        playlist_id: playlist_id,
-                        video_name: videoName.split('.')[0], // remove extension
-                        link: null,
-                        v_random_id: Str_Random(12),
-                        video_path: path.join(folder_path, videoName),
-                        cloud_url: null,
-                        cloud_public_id: null,
-                        downloaded: true,
-                        thumbnail: null,
-                        duration: null
-                    });
-                } catch (createError) {
-                    console.error(`Error creating video record for ${videoName}:`, createError);
-                    return null;
-                }
-            }));
+            if (videoList.length > 1000) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Too many files. Maximum 1000 files allowed per request."
+                });
+            }
 
-            const successfulVideoRecords = videoRecords.filter(record => record !== null);
+            // Batch processing with controlled concurrency
+            const processVideoBatch = async (batch) => {
+                return Promise.all(batch.map(async (videoName) => {
+                    try {
+                        // Skip non-video files or hidden files
+                        if (!videoName.match(/\.(mp4|avi|mov|mkv)$/i)) {
+                            return null;
+                        }
+
+                        return await video.create({
+                            user_id: _user.user_id,
+                            playlist_id: playlist_id,
+                            video_name: path.parse(videoName).name, // More robust name extraction
+                            link: null,
+                            v_random_id: Str_Random(12),
+                            video_path: path.join(folder_path, videoName),
+                            cloud_url: null,
+                            cloud_public_id: null,
+                            downloaded: true,
+                            thumbnail: null,
+                            duration: null
+                        });
+                    } catch (createError) {
+                        console.error(`Error processing video ${videoName}:`, createError);
+                        return null;
+                    }
+                }));
+            };
+
+            const videoRecords = [];
+            const batch_size = 100;
+            for (let i = 0; i < videoList.length; i += batch_size) {
+                const batch = videoList.slice(i, i + batch_size);
+                const batchRecords = await processVideoBatch(batch);
+                videoRecords.push(...batchRecords.filter(record => record !== null));
+            }
 
             res.status(200).json({
                 success: true,
-                message: "Folder accessed successfully",
-                videos: videoRecords,
-                totalVideos: videoList.length,
-                createdVideos: successfulVideoRecords.length,
+                message: "Folder processed successfully",
+                totalFiles: videoList.length,
+                processedVideos: videoRecords.length,
+                videos: videoRecords.map(v => ({
+                    id: v.id,
+                    video_name: v.video_name,
+                    video_path: v.video_path
+                }))
             });
 
         } catch (error) {
+            console.error('Folder access error:', error);
             res.status(500).json({
                 success: false,
-                message: error.message
+                message: "Internal server error",
+                error: error.message
             });
         }
     },
@@ -517,6 +691,16 @@ module.exports = {
                 });
             }
 
+            // Create a more comprehensive cache key
+            const cacheKey = `user:${_user.user_id}:old`;
+    
+            // Check cache first
+            const cached = cache.get(cacheKey);
+            if (cached) {
+                console.log(`Returning cached playlist videos for ${cacheKey}`);
+                return res.status(200).json(cached);
+            }
+
             const videos = await video.findAll({
                 where: {
                     user_id: _user.user_id,
@@ -533,6 +717,14 @@ module.exports = {
                     message: "No videos were found"
                 });
             }
+
+            // Cache the results with a more specific TTL based on playlist size
+            const cacheTTL = videos.length > 0 
+                ? Math.min(36000, Math.max(3600, videos.length * 60)) // Dynamic TTL
+                : 3600; // 1 hour default for empty playlists
+    
+            cache.set(cacheKey, videos, cacheTTL);
+            console.log(`Found and cached ${videos.length} videos for ${cacheTTL} seconds`);
 
             res.status(200).json({
                 success: true,
